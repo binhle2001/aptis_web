@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: aptis_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432" # Sử dụng biến môi trường hoặc mặc định 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: aptis_app_service # Đổi tên để tránh trùng với tên image
+    restart: on-failure
+    env_file:
+      - .env # Load environment variables from .env file
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app # Mount thư mục app để live reload khi dev
+    ports:
+      - 5055:5055 # APP_PORT từ .env hoặc mặc định 5055
+    # CMD trong Dockerfile sẽ được sử dụng
+    # command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5055", "--reload"] # Có thể ghi đè CMD ở đây
+
+volumes:
+  postgres_data:

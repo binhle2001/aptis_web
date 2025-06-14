@@ -1,0 +1,10 @@
+psycopg2-binary
+python-dotenv
+fastapi
+uvicorn
+python-jose[cryptography]
+passlib[bcrypt]
+frontend
+pdfplumber
+python-multipart
+openpyxl
