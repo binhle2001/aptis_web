@@ -349,7 +349,7 @@ async def create_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc 
                 print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
     
         
-# delete_exam_data(8)
+# delete_reading_exam_data(8)
 def get_reading_exam_by_id(exam_id):
     conn = get_db_connection() 
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -465,3 +465,80 @@ def get_reading_exam_by_id(exam_id):
     conn.close()
     
     return result
+
+
+def get_listening_exam_by_id(exam_id):
+    pass
+
+def get_exam_by_id(exam_id):
+    try:
+        conn = get_db_connection() 
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("SELECT id, exam_type from exams WHERE id = %s", (exam_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exam id {exam_id} not found")
+        exam_type = row["exam_type"]
+        if exam_type == "reading":
+            return get_reading_exam_by_id(exam_id)
+        else:
+            return get_listening_exam_by_id(exam_id)
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if conn:
+            conn.close()
+            cur.close()
+            
+def update_exam_by_id(exam_id, json_content):
+    try:
+        conn = get_db_connection() 
+        # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+            cur_validate.execute("SELECT id, exam_type FROM exams WHERE id = %s", (exam_id,))
+            row = cur_validate.fetchone()
+            if not row:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        if row["exam_type"] == "reading":
+            
+            tables = [
+                'reading_part_1',
+                'reading_part_2',
+                'reading_part_3',
+                'reading_part_4',
+            ]
+
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
+            conn.commit()
+            print("ngungungungu")
+            part1 = json_content["part1"]
+            part2 = json_content["part2"]
+            part3 = json_content["part3"]
+            part4 = json_content["part4"]
+            insert_reading_part1_json(part1, exam_id)
+            insert_reading_part2_json(part2, exam_id)
+            insert_reading_part3_json(part3, exam_id)
+            insert_reading_part4_json(part4, exam_id)  
+            return get_reading_exam_by_id(exam_id)
+        
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if conn:
+            conn.close()
+            
+        

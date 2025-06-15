@@ -4,8 +4,11 @@
 import psycopg2
 from fastapi import HTTPException, status
 from app.schemas.exam_set_schema import ExamSetCreateSchema
+from app.schemas.user_schema import MessageResponseSchema
 from app.services.auth_service import get_db_connection
 from typing import Optional, Dict, Any, List
+
+from app.services.exam_service import delete_exam_data
 async def create_exam_set(set_data: ExamSetCreateSchema, created_by_user_id: int) -> dict:
     
     conn = None
@@ -172,12 +175,14 @@ async def deactivate_exam_set(exam_set_id: int, deleted_by_user_id: int) -> None
                 (exam_set_id,)
             )
             row = cur.fetchone()
+            
             if not row:
                 raise HTTPException(status_code=404, detail="Exam set not found.")
-            if not row[0]:
+            
+            if not row["is_active"]:
                 # đã inactive rồi
-                return
-
+                raise HTTPException(status_code=400, detail="Exam set has been inactive")
+            
             # 2) Soft‑delete + ghi deleted_by_user_id + cập nhật updated_at
             cur.execute(
                 """
@@ -189,6 +194,7 @@ async def deactivate_exam_set(exam_set_id: int, deleted_by_user_id: int) -> None
                 """,
                 (False, deleted_by_user_id, exam_set_id)
             )
+            
             conn.commit()
 
     except HTTPException:
@@ -203,3 +209,79 @@ async def deactivate_exam_set(exam_set_id: int, deleted_by_user_id: int) -> None
         if conn:
             conn.close()
 
+async def reactivate_exam_set(exam_set_id: int) -> None:
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 1) Kiểm tra tồn tại & active
+            cur.execute(
+                "SELECT is_active FROM exam_sets WHERE id = %s",
+                (exam_set_id,)
+            )
+            row = cur.fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail="Exam set not found.")
+            
+            if row["is_active"]:
+                # đã inactive rồi
+                
+                raise HTTPException(status_code=400, detail="Exam set have already actived")
+            
+            # 2) Soft‑delete + ghi deleted_by_user_id + cập nhật updated_at
+            cur.execute(
+                """
+                UPDATE exam_sets
+                   SET is_active = %s,
+                       updated_at = now()
+                 WHERE id = %s
+                """,
+                (True,  exam_set_id)
+            )
+            
+            conn.commit()
+        return True
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+def delete_exam_set(exam_set_id: int):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 1) Kiểm tra tồn tại & active
+            cur.execute(
+                "SELECT id FROM exams WHERE examset_id = %s",
+                (exam_set_id,)
+            )
+            rows = cur.fetchall()
+            
+            for row in rows:
+                exam_id = row["id"]
+                
+                delete_exam_data(exam_id)
+            cur.execute(
+                "DELETE FROM exam_sets WHERE id = %s", (exam_set_id, )
+            )
+        conn.commit()
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if conn:
+            conn.close()

@@ -50,3 +50,10 @@ class ExamReadingFormParams(BaseModel): # Không dùng trực tiếp, chỉ đ�
     exam_code: str = Field(..., example="RD001_V2")
     time_limit_minutes: int = Field(..., gt=0, example=60)
     # file: UploadFile sẽ được xử lý riêng
+    
+class ExamReadingUpdate(BaseModel):
+    json_content: dict = Field(..., example="Nội dung sau chỉnh sửa")
+    class Config:
+        json_schema_extra = {
+            "json_content": {}
+        }

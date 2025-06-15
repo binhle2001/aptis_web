@@ -1,11 +1,12 @@
 from typing import Annotated # Python 3.9+
 # from typing_extensions import Annotated # Python < 3.9
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
+from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from app.schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
 from app.services import user_service, exam_service, exam_set_service 
 from app.core.deps import get_current_admin_user # Dependency để xác thực Admin
-from app.schemas.exam_schema import ExamCreateResponseSchema
+from app.schemas.exam_schema import ExamCreateResponseSchema, ExamReadingUpdate
 from app.schemas.exam_set_schema import ExamSetCreateSchema, ExamSetListResponseSchema, ExamSetResponseSchema
 
 router = APIRouter(
@@ -279,6 +280,38 @@ async def get_exam_set_endpoint(
     return ExamSetResponseSchema(**exam_set)
 
 
+@router.patch(
+    "/exam-sets/{exam_set_id}/activate",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_exam_set_endpoint(
+    exam_set_id: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    """
+    Soft‑delete một ExamSet (chỉ set is_active = false).
+    """
+    
+    success = await exam_set_service.reactivate_exam_set(exam_set_id)
+    # 204 No Content
+    
+    return MessageResponseSchema(message = f"Exam set {exam_set_id} deactivated")
+    
+@router.patch(
+    "/exam-sets/{exam_set_id}/deactivate",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_exam_set_endpoint(
+    exam_set_id: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    """
+    Soft‑delete một ExamSet (chỉ set is_active = false).
+    """
+    success = await exam_set_service.deactivate_exam_set(exam_set_id, current_admin["id"])
+    # 204 No Content
+    return MessageResponseSchema(message = f"Exam set {exam_set_id} activated")
+
 @router.delete(
     "/exam-sets/{exam_set_id}",
     status_code=status.HTTP_204_NO_CONTENT
@@ -290,5 +323,23 @@ async def delete_exam_set_endpoint(
     """
     Soft‑delete một ExamSet (chỉ set is_active = false).
     """
-    await exam_set_service.deactivate_exam_set(exam_set_id, current_admin["id"])
+    success =  exam_set_service.delete_exam_set(exam_set_id)
     # 204 No Content
+    return MessageResponseSchema(message = f"Exam set {exam_set_id} deleted")
+
+@router.get("/exam/{exam__id}")
+async def get_exam_set_endpoint(
+    exam__id: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    exam_set = exam_service.get_exam_by_id(exam__id)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
+
+@router.patch("/exam/{exam_id}")
+async def get_exam_set_endpoint(
+    exam_id: int,
+    item: ExamReadingUpdate,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    exam_set = exam_service.update_exam_by_id(exam_id, item.json_content)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
