@@ -48,9 +48,15 @@ async def login_for_access_token(form_data: UserLoginSchema):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT user_id, username, password_hash, role, full_name, is_active FROM Users WHERE username = %s", (form_data.username,))
+            cur.execute("SELECT id, username, password_hash, role, fullname, is_active FROM Users WHERE username = %s", (form_data.username,))
             user_in_db = cur.fetchone()
-
+        
+        if not user_in_db["is_active"]:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User inactive",
+                headers={"is_active": "false"},
+            )
         if not user_in_db:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -72,9 +78,9 @@ async def login_for_access_token(form_data: UserLoginSchema):
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token_data = {
             "sub": user_in_db["username"], # "sub" is a standard claim for subject (username)
-            "user_id": user_in_db["user_id"],
+            "user_id": user_in_db["id"],
             "role": user_in_db["role"],
-            "full_name": user_in_db["full_name"]
+            "full_name": user_in_db["fullname"]
             # Bạn có thể thêm các thông tin khác vào payload của token nếu cần
         }
         access_token = create_access_token(
@@ -114,13 +120,13 @@ async def create_sample_user(username, password, full_name, role="member"):
             hashed_password = get_password_hash(password)
             cur.execute(
                 """
-                INSERT INTO Users (username, password_hash, full_name, role)
+                INSERT INTO Users (username, password_hash, fullname, role)
                 VALUES (%s, %s, %s, %s)
-                RETURNING user_id;
+                RETURNING id;
                 """,
                 (username, hashed_password, full_name, role)
             )
-            user_id = cur.fetchone()['user_id']
+            user_id = cur.fetchone()['id']
             conn.commit()
             print(f"User '{username}' created successfully with ID: {user_id} and role: {role}.")
             return {"user_id": user_id, "username": username, "role": role}

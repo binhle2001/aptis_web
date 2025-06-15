@@ -1,40 +1,70 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
 from typing import Optional, List
+from pydantic import BaseModel, Field
 
+
+# -----------------------------
+# Schema để tạo mới exam set
+# -----------------------------
 class ExamSetCreateSchema(BaseModel):
     set_code: str = Field(..., example="APTIS_GENERAL_001")
     title: str = Field(..., example="Bộ đề thi Aptis tổng quát số 1")
-    description: Optional[str] = None
-    overall_time_limit_minutes: Optional[int] = Field(None, gt=0, example=120)
+    description: Optional[str] = Field(None, example="Mô tả ngắn về bộ đề thi")
 
+
+# -----------------------------
+# Schema tóm tắt thông tin một bài thi
+# -----------------------------
+class ExamBriefSchema(BaseModel):
+    id: int
+    exam_code: str
+    exam_type: str  # e.g. "READING", "LISTENING"
+    description: Optional[str]
+    time_limit: int
+
+
+# -----------------------------
+# Schema trả về chi tiết một exam set
+# -----------------------------
 class ExamSetResponseSchema(BaseModel):
-    exam_set_id: int
+    id: int
     set_code: str
     title: str
-    description: Optional[str] = None
-    overall_time_limit_minutes: Optional[int] = None
+    description: Optional[str]
     created_by_user_id: int
     is_active: bool
-    created_at: str # Hoặc datetime
-    updated_at: str # Hoặc datetime
+    created_at: datetime
+    updated_at: datetime
+    exams: List[ExamBriefSchema] = []
 
     class Config:
-        json_schema_extra = { # Pydantic V2
+        json_schema_extra = {
             "example": {
-                "exam_set_id": 1,
+                "id": 1,
                 "set_code": "APTIS_GENERAL_001",
                 "title": "Bộ đề thi Aptis tổng quát số 1",
-                "overall_time_limit_minutes": 120,
+                "description": "Mô tả ngắn về bộ đề",
                 "created_by_user_id": 1,
                 "is_active": True,
-                "created_at": "2023-10-27T10:00:00Z",
-                "updated_at": "2023-10-27T10:00:00Z"
+                "created_at": "2025-06-15T09:00:00",
+                "updated_at": "2025-06-15T09:00:00",
+                "exams": [
+                    {
+                        "id": 10,
+                        "exam_code": "RD001",
+                        "exam_type": "READING",
+                        "description": "Đề kiểm tra kỹ năng đọc",
+                        "time_limit": 40
+                    }
+                ]
             }
         }
-        # orm_mode = True # Pydantic V1
 
+
+# -----------------------------
+# Schema trả về danh sách exam sets (có phân trang)
+# -----------------------------
 class ExamSetListResponseSchema(BaseModel):
     items: List[ExamSetResponseSchema]
     total: int
-    limit: Optional[int] = None
-    skip: Optional[int] = None
+    total_pages: int

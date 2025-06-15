@@ -16,7 +16,7 @@ async def create_new_user(user_data: UserCreateSchema) -> dict: # Trả về dic
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra username đã tồn tại chưa
-            cur.execute("SELECT user_id FROM Users WHERE username = %s", (user_data.username,))
+            cur.execute("SELECT id FROM Users WHERE username = %s", (user_data.username,))
             if cur.fetchone():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -29,9 +29,9 @@ async def create_new_user(user_data: UserCreateSchema) -> dict: # Trả về dic
             # 3. Lưu thông tin tài khoản mới với role "member"
             cur.execute(
                 """
-                INSERT INTO Users (username, password_hash, full_name, phone_number, role)
+                INSERT INTO Users (username, password_hash, fullname, phone_number, role)
                 VALUES (%s, %s, %s, %s, %s)
-                RETURNING user_id, username, full_name, phone_number, role, created_at, updated_at;
+                RETURNING id, username, fullname, phone_number, role, created_at, updated_at, is_active;
                 """,
                 (
                     user_data.username,
@@ -92,7 +92,7 @@ async def update_user_password_by_admin(user_id_to_update: int, password_data: U
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra xem user có tồn tại và có phải là 'member' không
-            cur.execute("SELECT user_id, username, role FROM Users WHERE user_id = %s", (user_id_to_update,))
+            cur.execute("SELECT id, username, role FROM Users WHERE id = %s", (user_id_to_update,))
             user_to_update = cur.fetchone()
 
             if not user_to_update:
@@ -117,7 +117,7 @@ async def update_user_password_by_admin(user_id_to_update: int, password_data: U
                 """
                 UPDATE Users
                 SET password_hash = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = %s;
+                WHERE id = %s;
                 """,
                 (new_hashed_password, user_id_to_update)
             )
@@ -168,7 +168,7 @@ async def deactivate_user_by_admin(user_id_to_deactivate: int, admin_username: s
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra xem user có tồn tại không
-            cur.execute("SELECT user_id, username, role, is_active FROM Users WHERE user_id = %s", (user_id_to_deactivate,))
+            cur.execute("SELECT id, username, role, is_active FROM Users WHERE id = %s", (user_id_to_deactivate,))
             user_to_deactivate = cur.fetchone()
 
             if not user_to_deactivate:
@@ -209,7 +209,7 @@ async def deactivate_user_by_admin(user_id_to_deactivate: int, admin_username: s
                 """
                 UPDATE Users
                 SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = %s;
+                WHERE id = %s;
                 """,
                 (user_id_to_deactivate,)
             )
@@ -260,7 +260,7 @@ async def reactivate_user_by_admin(user_id_to_reactivate: int, admin_username: s
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra xem user có tồn tại không
-            cur.execute("SELECT user_id, username, role, is_active FROM Users WHERE user_id = %s", (user_id_to_reactivate,))
+            cur.execute("SELECT id, username, role, is_active FROM Users WHERE id = %s", (user_id_to_reactivate,))
             user_to_reactivate = cur.fetchone()
 
             if not user_to_reactivate:
@@ -287,7 +287,7 @@ async def reactivate_user_by_admin(user_id_to_reactivate: int, admin_username: s
                 """
                 UPDATE Users
                 SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = %s;
+                WHERE id = %s;
                 """,
                 (user_id_to_reactivate,)
             )
@@ -330,7 +330,7 @@ async def reactivate_user_by_admin(user_id_to_reactivate: int, admin_username: s
 async def get_users_list(
     role: Optional[str] = None,
     search: Optional[str] = None,
-    skip: int = 0,
+    page: int = 0,
     limit: int = 100 # Giới hạn mặc định để tránh trả về quá nhiều dữ liệu
 ) -> Dict[str, Any]: # Trả về dict để UserListResponseSchema có thể parse
     conn = None
@@ -338,8 +338,8 @@ async def get_users_list(
         conn = get_db_connection()
         with conn.cursor() as cur:
             base_query = "FROM Users u WHERE 1=1"
-            count_query_str = "SELECT COUNT(u.user_id) " + base_query
-            data_query_str = "SELECT u.user_id, u.username, u.full_name, u.phone_number, u.role, u.is_active, u.created_at, u.updated_at " + base_query
+            count_query_str = "SELECT COUNT(u.id) " + base_query
+            data_query_str = "SELECT u.id, u.username, u.fullname, u.phone_number, u.role, u.is_active, u.created_at, u.updated_at " + base_query
 
             conditions = []
             params = {} # Sử dụng dict cho named placeholders nếu psycopg2 hỗ trợ, hoặc list cho %s
@@ -350,7 +350,7 @@ async def get_users_list(
             
             if search:
                 # Tìm kiếm không phân biệt chữ hoa chữ thường
-                conditions.append("(u.username ILIKE %(search)s OR u.full_name ILIKE %(search)s)")
+                conditions.append("(u.username ILIKE %(search)s OR u.fullname ILIKE %(search)s)")
                 params['search'] = f"%{search}%"
 
             if conditions:
@@ -401,7 +401,7 @@ async def get_users_list(
                 query_conditions.append("u.role = %s")
                 query_params_list.append(role)
             if search:
-                query_conditions.append("(u.username ILIKE %s OR u.full_name ILIKE %s)")
+                query_conditions.append("(u.username ILIKE %s OR u.fullname ILIKE %s)")
                 search_like = f"%{search}%"
                 query_params_list.append(search_like)
                 query_params_list.append(search_like)
@@ -410,19 +410,19 @@ async def get_users_list(
             if query_conditions:
                 where_clause = " AND " + " AND ".join(query_conditions)
             
-            final_count_query_str = "SELECT COUNT(u.user_id) FROM Users u WHERE 1=1" + where_clause
+            final_count_query_str = "SELECT COUNT(u.id) FROM Users u WHERE 1=1" + where_clause
             cur.execute(final_count_query_str, tuple(query_params_list))
             total_count = cur.fetchone()['count']
 
 
             # Thêm ORDER BY, LIMIT, OFFSET cho data query
-            final_data_query_str = ("SELECT u.user_id, u.username, u.full_name, u.phone_number, u.role, u.is_active, "
+            final_data_query_str = ("SELECT u.id, u.username, u.fullname, u.phone_number, u.role, u.is_active, "
                                  "u.created_at, u.updated_at FROM Users u WHERE 1=1" + where_clause +
-                                 " ORDER BY u.user_id ASC LIMIT %s OFFSET %s") # Hoặc DESC
+                                 " ORDER BY u.id ASC LIMIT %s OFFSET %s") # Hoặc DESC
             
             data_params_list = query_params_list.copy()
             data_params_list.append(limit)
-            data_params_list.append(skip)
+            data_params_list.append((page-1) * limit)
             
             cur.execute(final_data_query_str, tuple(data_params_list))
             users_data = cur.fetchall()
@@ -439,7 +439,7 @@ async def get_users_list(
                 "items": items,
                 "total": total_count,
                 "limit": limit,
-                "skip": skip
+                "page": page
             }
 
     except psycopg2.Error as db_error:
@@ -452,6 +452,76 @@ async def get_users_list(
         print(f"Unexpected error while fetching users list: {e}")
         # import traceback
         # traceback.print_exc() # In traceback đầy đủ để debug
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred."
+        )
+    finally:
+        if conn:
+            conn.close()
+            
+async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
+    """
+    Admin deletes a member's account by setting is_active to True.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 1. Kiểm tra xem user có tồn tại không
+            cur.execute("SELECT id, username, role, is_active FROM Users WHERE id = %s", (user_id,))
+            user_to_delete = cur.fetchone()
+
+            if not user_to_delete:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with ID {user_id} not found."
+                )
+
+            # 2. Bạn có thể thêm các kiểm tra logic nghiệp vụ khác ở đây nếu cần
+            # Ví dụ: chỉ cho phép kích hoạt lại 'member'
+            if user_to_delete["role"] != "member":
+                 raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Cannot delete user '{user_to_delete['username']}' with role '{user_to_delete['role']}'. Only member accounts can be deleted."
+                )
+            user_id_to_delete = user_to_delete["id"]
+
+          
+            cur.execute(
+                """
+                DELETE FROM Users WHERE id = %s;
+                """,
+                (user_id_to_delete,)
+            )
+            
+            if cur.rowcount == 0:
+                conn.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, # Hoặc 500
+                    detail=f"User with ID {user_id_to_delete} not found during reactivation, or no changes made."
+                )
+
+            conn.commit()
+            print(f"User ID {user_id_to_delete} is deleted by admin {admin_username}.")
+            return True
+
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except psycopg2.Error as db_error:
+        if conn:
+            conn.rollback()
+        print(f"Database error during user reactivation: {db_error}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="A database error occurred while reactivating the user."
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Unexpected error during user reactivation: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred."

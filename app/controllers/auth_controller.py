@@ -44,6 +44,7 @@ async def login_for_access_token_endpoint(
 async def create_dev_user_endpoint(username: str, password: str, full_name: str, role: str = "member"):
     # CẢNH BÁO: Endpoint này không an toàn cho production. Chỉ dùng để dev.
     # Trong thực tế, bạn sẽ có một quy trình đăng ký user riêng.
+    print(username, password)
     user = await auth_service.create_sample_user(username, password, full_name, role)
     if user:
         return {"message": f"User {username} created/verified.", "user": user}

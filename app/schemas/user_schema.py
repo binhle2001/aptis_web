@@ -19,27 +19,28 @@ class UserCreateSchema(BaseModel):
         }
 
 class UserResponseSchema(BaseModel):
-    user_id: int
+    id: int
     username: str
-    full_name: str
+    fullname: str
     phone_number: Optional[str] = None
     role: str
     created_at: str # Hoặc datetime, tùy bạn muốn format thế nào
     updated_at: str # Hoặc datetime
-
+    is_active: bool
     class Config:
         # Nếu bạn dùng ORM và muốn trả về model trực tiếp
         # from_attributes = True # Pydantic V2
         # orm_mode = True # Pydantic V1
         json_schema_extra = {
             "example": {
-                "user_id": 1,
+                "id": 1,
                 "username": "member01",
-                "full_name": "Member Full Name",
+                "fullname": "Member Full Name",
                 "phone_number": "0123456789",
                 "role": "member",
                 "created_at": "2023-10-27T10:00:00Z",
-                "updated_at": "2023-10-27T10:00:00Z"
+                "updated_at": "2023-10-27T10:00:00Z",
+                "is_active": True
             }
         }
 
@@ -73,7 +74,7 @@ class UserListResponseSchema(BaseModel):
     items: List[UserResponseSchema]
     total: int # Tổng số lượng bản ghi khớp với query (trước khi phân trang)
     limit: Optional[int] = None
-    skip: Optional[int] = None
+    page: Optional[int] = None
 
     class Config:
         json_schema_extra = {
@@ -100,6 +101,6 @@ class UserListResponseSchema(BaseModel):
                 ],
                 "total": 25,
                 "limit": 10,
-                "skip": 0
+                "page": 0
             }
         }

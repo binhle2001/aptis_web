@@ -32,7 +32,7 @@ async def get_current_active_user(
         conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT user_id, username, full_name, role, phone_number, is_active, created_at, updated_at " # Thêm is_active
+                "SELECT id, username, fullname, role, phone_number, is_active, created_at, updated_at " # Thêm is_active
                 "FROM Users WHERE username = %s", (current_user_token_payload.sub,)
             )
             user_in_db = cur.fetchone()

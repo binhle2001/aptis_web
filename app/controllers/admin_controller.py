@@ -6,7 +6,7 @@ from app.schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUp
 from app.services import user_service, exam_service, exam_set_service 
 from app.core.deps import get_current_admin_user # Dependency để xác thực Admin
 from app.schemas.exam_schema import ExamCreateResponseSchema
-from app.schemas.exam_set_schema import ExamSetCreateSchema, ExamSetResponseSchema
+from app.schemas.exam_set_schema import ExamSetCreateSchema, ExamSetListResponseSchema, ExamSetResponseSchema
 
 router = APIRouter(
     prefix="/api/admin",
@@ -64,7 +64,7 @@ async def update_member_password_by_admin(
             detail="Failed to update password."
         )
     
-@router.delete("/users/{user_id_to_deactivate}", response_model=MessageResponseSchema)
+@router.patch("/users/{user_id_to_deactivate}/deactivate", response_model=MessageResponseSchema)
 async def deactivate_user_endpoint(
     user_id_to_deactivate: int,
     current_admin: Annotated[dict, Depends(get_current_admin_user)] # Lấy thông tin admin đang thực hiện
@@ -119,7 +119,7 @@ async def get_users_list_by_admin(
     # current_admin: Annotated[dict, Depends(get_current_admin_user)], # Đã có ở router level
     role: Optional[str] = Query(None, description="Filter by user role (e.g., 'member', 'admin')"),
     search: Optional[str] = Query(None, min_length=1, description="Search term for username or full name"),
-    skip: int = Query(0, ge=0, description="Number of records to skip for pagination"),
+    page: int = Query(0, ge=0, description="Number of page"),
     limit: int = Query(100, ge=1, le=200, description="Maximum number of records to return") # Giới hạn max limit
 ):
     """
@@ -131,11 +131,35 @@ async def get_users_list_by_admin(
     users_data = await user_service.get_users_list(
         role=role,
         search=search,
-        skip=skip,
+        page=page,
         limit=limit
     )
     # UserListResponseSchema sẽ tự động parse dict và validate
     return UserListResponseSchema(**users_data)
+@router.delete("/users/{user_id_to_delete}", response_model=MessageResponseSchema)
+async def delete_user_endpoint(
+    user_id_to_delete: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    """
+    Admin reactivates a previously deactivated member account.
+    - **user_id_to_reactivate**: The ID of the member account to reactivate.
+    """
+    admin_username = current_admin['username']
+    # print(f"Admin '{admin_username}' is attempting to reactivate user ID {user_id_to_reactivate}.")
+    
+    success = await user_service.delete_user_by_admin(user_id_to_delete, admin_username)
+    
+    if success:
+        return MessageResponseSchema(message=f"User ID {user_id_to_delete} has been delete successfully.")
+    else:
+        # Hàm service sẽ raise exception, nên dòng này thường không được gọi
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user."
+        )
+
+
 @router.post(
     "/exam-sets/{exam_set_id}/reading-exam", 
     response_model=ExamCreateResponseSchema, 
@@ -179,17 +203,17 @@ async def create_reading_exam_for_set_endpoint(
     if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Invalid file type or no filename. Only PDF files (.pdf) are allowed."
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
         )
 
-    created_by_user_id = current_admin['user_id']
+    created_by_user_id = current_admin['id']
     
     try:
         exam_details_dict = await exam_service.create_reading_exam_from_excel(
             exam_set_id=exam_set_id,
             exam_part_code=exam_part_code,
-            title_for_part=title_for_part,
-            time_limit_minutes_for_part=time_limit_minutes_for_part,
+            descriptions=title_for_part,
+            time_limit_for_part=time_limit_minutes_for_part,
             excel_file=file,
             created_by_user_id=created_by_user_id
         )
@@ -204,11 +228,11 @@ async def create_reading_exam_for_set_endpoint(
         # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'reading', 'time_limit_minutes': ...}
         
         return ExamCreateResponseSchema(
-            exam_id=exam_details_dict['exam_id'],
+            exam_id=exam_details_dict['id'],
             exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
-            title=exam_details_dict['title'],         # Đây là title_for_part
+            title=exam_details_dict['description'],         # Đây là title_for_part
             exam_type=exam_details_dict['exam_type'],
-            time_limit_minutes=exam_details_dict.get('time_limit_minutes'), # Lấy từ record đã tạo
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
             message=f"Reading exam part '{exam_part_code}' created successfully for ExamSet ID {exam_set_id}."
         )
     except HTTPException as e:
@@ -225,6 +249,46 @@ async def create_exam_set_endpoint(
     set_in: ExamSetCreateSchema,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
 ):
-    created_by_user_id = current_admin['user_id']
+    created_by_user_id = current_admin['id']
     created_set = await exam_set_service.create_exam_set(set_in, created_by_user_id)
     return ExamSetResponseSchema(**created_set)
+
+@router.get(
+    "/exam-sets",
+    response_model=ExamSetListResponseSchema,
+)
+async def list_exam_sets_endpoint(
+    search: Optional[str] = Query("", description="Filter by exam code, title (e.g., 'R0001')"),
+    page: int = Query(0, ge=0, description="Number of page"),
+    limit: int = Query(1, ge=1, le=200, description="Maximum number of records to return"), # Giới hạn max limit,
+    _: Annotated[dict, Depends(get_current_admin_user)] = None,  # nếu cần xác thực admin
+):
+    """
+    Lấy danh sách ExamSet có thể filter theo `search`, phân trang với `page` và `limit`.
+    Trả về cả `total` và `total_pages`.
+    """
+    data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit)
+    return ExamSetListResponseSchema(**data)
+
+@router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)
+async def get_exam_set_endpoint(
+    exam_set_id: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id)
+    return ExamSetResponseSchema(**exam_set)
+
+
+@router.delete(
+    "/exam-sets/{exam_set_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_exam_set_endpoint(
+    exam_set_id: int,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    """
+    Soft‑delete một ExamSet (chỉ set is_active = false).
+    """
+    await exam_set_service.deactivate_exam_set(exam_set_id, current_admin["id"])
+    # 204 No Content
