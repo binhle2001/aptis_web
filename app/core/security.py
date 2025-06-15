@@ -24,7 +24,7 @@ class TokenData(BaseModel):
     sub: Optional[str] = None # username
     user_id: Optional[int] = None
     role: Optional[str] = None
-    full_name: Optional[str] = None
+    fullname: Optional[str] = None
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -58,14 +58,14 @@ def decode_access_token(token: str) -> TokenData : # Trả về TokenData thay v
 # DUMMY_USERS_DB = {
 #     "admin": {
 #         "username": "admin",
-#         "full_name": "Admin User",
+#         "fullname": "Admin User",
 #         "password_hash": get_password_hash("admin123"), # Store hashed passwords
 #         "role": "admin",
 #         "is_active": True
 #     },
 #     "member1": {
 #         "username": "member1",
-#         "full_name": "Member One",
+#         "fullname": "Member One",
 #         "password_hash": get_password_hash("member123"),
 #         "role": "member",
 #         "is_active": True

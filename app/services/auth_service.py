@@ -78,9 +78,9 @@ async def login_for_access_token(form_data: UserLoginSchema):
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token_data = {
             "sub": user_in_db["username"], # "sub" is a standard claim for subject (username)
-            "user_id": user_in_db["id"],
+            "id": user_in_db["id"],
             "role": user_in_db["role"],
-            "full_name": user_in_db["fullname"]
+            "fullname": user_in_db["fullname"]
             # Bạn có thể thêm các thông tin khác vào payload của token nếu cần
         }
         access_token = create_access_token(
@@ -101,7 +101,7 @@ async def login_for_access_token(form_data: UserLoginSchema):
             conn.close()
 
 # --- Hàm tiện ích để tạo user mẫu (chạy một lần hoặc khi cần) ---
-async def create_sample_user(username, password, full_name, role="member"):
+async def create_sample_user(username, password, fullname, role="member"):
     """
     Tạo một user mẫu với password đã hash.
     Lưu ý: Chỉ chạy hàm này một lần để tạo user, hoặc khi cần.
@@ -124,12 +124,12 @@ async def create_sample_user(username, password, full_name, role="member"):
                 VALUES (%s, %s, %s, %s)
                 RETURNING id;
                 """,
-                (username, hashed_password, full_name, role)
+                (username, hashed_password, fullname, role)
             )
             user_id = cur.fetchone()['id']
             conn.commit()
             print(f"User '{username}' created successfully with ID: {user_id} and role: {role}.")
-            return {"user_id": user_id, "username": username, "role": role}
+            return {"id": user_id, "username": username, "role": role}
     except Exception as e:
         if conn:
             conn.rollback()

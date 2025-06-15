@@ -36,7 +36,7 @@ async def create_new_user(user_data: UserCreateSchema) -> dict: # Trả về dic
                 (
                     user_data.username,
                     hashed_password,
-                    user_data.full_name,
+                    user_data.fullname,
                     user_data.phone_number,
                     "member"  # Role được cố định là 'member'
                 )

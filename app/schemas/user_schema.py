@@ -3,7 +3,7 @@ from typing import Optional
 
 class UserCreateSchema(BaseModel):
     username: str = Field(..., min_length=3, max_length=100, example="newmember01")
-    full_name: str = Field(..., min_length=1, max_length=255, example="New Member Name")
+    fullname: str = Field(..., min_length=1, max_length=255, example="New Member Name")
     password: str = Field(..., min_length=6, example="SecureP@ssw0rd1")
     phone_number: Optional[str] = Field(None, max_length=20, example="0912345678")
     # role sẽ được set mặc định là "member" bởi service
@@ -12,7 +12,7 @@ class UserCreateSchema(BaseModel):
         json_schema_extra = {
             "example": {
                 "username": "newmember01",
-                "full_name": "New Member Full Name",
+                "fullname": "New Member Full Name",
                 "password": "verysecretpassword",
                 "phone_number": "0987654321"
             }
@@ -81,18 +81,18 @@ class UserListResponseSchema(BaseModel):
             "example": {
                 "items": [
                     {
-                        "user_id": 1,
+                        "id": 1,
                         "username": "member01",
-                        "full_name": "Member Full Name",
+                        "fullname": "Member Full Name",
                         "phone_number": "0123456789",
                         "role": "member",
                         "created_at": "2023-10-27T10:00:00Z",
                         "updated_at": "2023-10-27T10:00:00Z"
                     },
                     {
-                        "user_id": 2,
+                        "id": 2,
                         "username": "admin01",
-                        "full_name": "Admin Full Name",
+                        "fullname": "Admin Full Name",
                         "phone_number": "0987654321",
                         "role": "admin",
                         "created_at": "2023-10-26T09:00:00Z",

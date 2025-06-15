@@ -28,7 +28,7 @@ async def create_user_by_admin(
     """
     Admin creates a new member account.
     - **username**: Unique username for login.
-    - **full_name**: Full name of the member.
+    - **fullname**: Full name of the member.
     - **password**: Member's password (will be hashed).
     - **phone_number**: Optional phone number.
     """

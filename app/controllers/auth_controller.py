@@ -41,11 +41,10 @@ async def login_for_access_token_endpoint(
 # Ví dụ thêm endpoint để tạo user mẫu (chỉ dùng cho mục đích dev)
 # Bạn nên bảo vệ endpoint này hoặc chỉ chạy từ script
 @router.post("/create-dev-user", include_in_schema=False) # include_in_schema=False để ẩn khỏi Swagger UI
-async def create_dev_user_endpoint(username: str, password: str, full_name: str, role: str = "member"):
+async def create_dev_user_endpoint(username: str, password: str, fullname: str, role: str = "member"):
     # CẢNH BÁO: Endpoint này không an toàn cho production. Chỉ dùng để dev.
     # Trong thực tế, bạn sẽ có một quy trình đăng ký user riêng.
-    print(username, password)
-    user = await auth_service.create_sample_user(username, password, full_name, role)
+    user = await auth_service.create_sample_user(username, password, fullname, role)
     if user:
         return {"message": f"User {username} created/verified.", "user": user}
     return {"message": f"Failed to create user {username}."}
