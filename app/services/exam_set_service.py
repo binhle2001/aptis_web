@@ -86,7 +86,7 @@ async def get_exam_set(
             total_pages = math.ceil(total / limit) if limit > 0 else 0
 
             # 4) Truy vấn dữ liệu từng page
-            offset = page * limit
+            offset = (page-1) * limit
             data_sql = f"""
                 SELECT 
                   id, set_code, title, description, created_by_user_id,
