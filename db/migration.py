@@ -1,136 +1,194 @@
-# aptis_migration.py
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-from sqlalchemy.sql import func
-import enum
+import psycopg2
 
-Base = declarative_base()
+# Cấu hình kết nối
+conn = psycopg2.connect(
+    dbname="aptis_db",
+    user="admin",
+    password="qwerty",
+    host="localhost",
+    port=5432
+)
+cur = conn.cursor()
 
-# Enum cho loại bài thi
-class ExamType(enum.Enum):
-    READING = 'reading'
-    LISTENING = 'listening'
+# Danh sách câu lệnh tạo bảng
+create_tables = [
 
-# Bảng Người dùng
-class User(Base):
-    __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(50), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    fullname = Column(String(100), nullable=False)
-    phone_number = Column(String(20), nullable=True)
-    role = Column(String(20), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    # Bảng users
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        fullname VARCHAR(100) NOT NULL,
+        phone_number VARCHAR(20),
+        role VARCHAR(20) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+    """,
 
-# Bảng Bộ đề thi
-class ExamSet(Base):
-    __tablename__ = 'exam_sets'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    set_code = Column(String(50), unique=True, nullable=False)
-    title = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    created_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    created_by = relationship('User', backref='exam_sets')
+    # Bảng exam_sets
+    """
+    CREATE TABLE IF NOT EXISTS exam_sets (
+        id SERIAL PRIMARY KEY,
+        set_code VARCHAR(50) UNIQUE NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        created_by_user_id INTEGER REFERENCES users(id) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+    """,
 
-# Bảng Bài thi
-class Exam(Base):
-    __tablename__ = 'exams'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    examset_id = Column(Integer, ForeignKey('exam_sets.id'), nullable=False)
-    exam_code = Column(String(50), unique=True, nullable=False)
-    exam_type = Column(String(20), nullable=False)
-    description = Column(Text, nullable=True)
-    time_limit = Column(Integer, nullable=False)  # Thời gian làm bài (phút)
-    created_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    exam_set = relationship('ExamSet', backref='exams')
-    created_by = relationship('User', backref='exams')
+    # Bảng exams
+    """
+    CREATE TABLE IF NOT EXISTS exams (
+        id SERIAL PRIMARY KEY,
+        examset_id INTEGER REFERENCES exam_sets(id) NOT NULL,
+        exam_code VARCHAR(50) UNIQUE NOT NULL,
+        exam_type VARCHAR(20) NOT NULL,
+        description TEXT,
+        time_limit INTEGER NOT NULL,
+        created_by_user_id INTEGER REFERENCES users(id) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+    """,
 
-# Bảng Reading Part 1
-class ReadingPart1(Base):
-    __tablename__ = 'reading_part_1'
-    
-    question_id = Column(Integer, primary_key=True, autoincrement=True)
-    exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
-    group_id = Column(Integer, nullable=False)  # 1 hoặc 2
-    question = Column(Text, nullable=False)
-    correct_answer = Column(String(10), nullable=False)
-    option1 = Column(Text, nullable=False)
-    option2 = Column(Text, nullable=False)
-    option3 = Column(Text, nullable=False)
-    
-    exam = relationship('Exam', backref='reading_part_1_questions')
+    # Reading Part 1
+    """
+    CREATE TABLE IF NOT EXISTS reading_part_1 (
+        question_id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        group_id INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        correct_answer VARCHAR(10) NOT NULL,
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL
+    );
+    """,
 
-# Bảng Reading Part 2
-class ReadingPart2(Base):
-    __tablename__ = 'reading_part_2'
-    
-    question_id = Column(Integer, primary_key=True, autoincrement=True)
-    exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
-    group_id = Column(Integer, nullable=False)  # 1, 2, 3 hoặc 4
-    topic = Column(Text, nullable=True)
-    sentence_text = Column(Text, nullable=False)
-    sentence_key = Column(Integer, nullable=False)
-    is_example_first = Column(Boolean, default=False)
-    
-    exam = relationship('Exam', backref='reading_part_2_questions')
+    # Reading Part 2
+    """
+    CREATE TABLE IF NOT EXISTS reading_part_2 (
+        question_id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        group_id INTEGER NOT NULL,
+        topic TEXT,
+        sentence_text TEXT NOT NULL,
+        sentence_key INTEGER NOT NULL,
+        is_example_first BOOLEAN DEFAULT FALSE
+    );
+    """,
 
-# Bảng Reading Part 3
-class ReadingPart3(Base):
-    __tablename__ = 'reading_part_3'
-    
-    question_id = Column(Integer, primary_key=True, autoincrement=True)
-    exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
-    group_id = Column(Integer, nullable=False)  # 1 hoặc 2
-    topic = Column(Text, nullable=True)
-    question_text = Column(Text, nullable=False)
-    correct_answer = Column(String(1), nullable=False)  # A, B, C, D
-    person_a = Column(Text, nullable=False)
-    person_b = Column(Text, nullable=False)
-    person_c = Column(Text, nullable=False)
-    person_d = Column(Text, nullable=False)
-    
-    exam = relationship('Exam', backref='reading_part_3_questions')
+    # Reading Part 3
+    """
+    CREATE TABLE IF NOT EXISTS reading_part_3 (
+        question_id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        group_id INTEGER NOT NULL,
+        topic TEXT,
+        question_text TEXT NOT NULL,
+        correct_answer VARCHAR(1) NOT NULL,
+        person_a TEXT NOT NULL,
+        person_b TEXT NOT NULL,
+        person_c TEXT NOT NULL,
+        person_d TEXT NOT NULL
+    );
+    """,
 
-# Bảng Reading Part 4
-class ReadingPart4(Base):
-    __tablename__ = 'reading_part_4'
-    
-    question_id = Column(Integer, primary_key=True, autoincrement=True)
-    exam_id = Column(Integer, ForeignKey('exams.id'), nullable=False)
-    topic = Column(Text, nullable=True)
-    paragraph = Column(Text, nullable=False)
-    correct_answer = Column(String(1), nullable=False)  # A, B, C, D, E, F, G, H
-    option1 = Column(Text, nullable=False)
-    option2 = Column(Text, nullable=False)
-    option3 = Column(Text, nullable=False)
-    option4 = Column(Text, nullable=False)
-    option5 = Column(Text, nullable=False)
-    option6 = Column(Text, nullable=False)
-    option7 = Column(Text, nullable=False)
-    option8 = Column(Text, nullable=False)
-    
-    exam = relationship('Exam', backref='reading_part_4_questions')
+    # Reading Part 4
+    """
+    CREATE TABLE IF NOT EXISTS reading_part_4 (
+        question_id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        topic TEXT,
+        paragraph TEXT NOT NULL,
+        correct_answer VARCHAR(1) NOT NULL,
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL,
+        option4 TEXT NOT NULL,
+        option5 TEXT NOT NULL,
+        option6 TEXT NOT NULL,
+        option7 TEXT NOT NULL,
+        option8 TEXT NOT NULL
+    );
+    """,
 
-# Kết nối database và tạo bảng
-if __name__ == "__main__":
-    # Thay đổi chuỗi kết nối theo database của bạn
-    DATABASE_URL = "postgresql://admin:qwerty@localhost/aptis_db"
-    # Hoặc dùng SQLite: "sqlite:///aptis.db"
-    
-    engine = create_engine(DATABASE_URL)
-    Base.metadata.create_all(engine)
-    
-    print("✅ Đã tạo xong các bảng cho phần Reading!")
+    # Listening Part 1
+    """
+    CREATE TABLE IF NOT EXISTS listening_part_1 (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        question TEXT NOT NULL,
+        audio_path TEXT NOT NULL,
+        correct_answer VARCHAR(10) NOT NULL,
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL
+    );
+    """,
+
+    # Listening Part 2
+        """
+    CREATE TABLE IF NOT EXISTS listening_part_2 (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        topic TEXT,
+        audio_path TEXT,
+        a INTEGER CHECK (a BETWEEN 1 AND 6),
+        b INTEGER CHECK (b BETWEEN 1 AND 6),
+        c INTEGER CHECK (c BETWEEN 1 AND 6),
+        d INTEGER CHECK (d BETWEEN 1 AND 6),
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL,
+        option4 TEXT NOT NULL,
+        option5 TEXT NOT NULL,
+        option6 TEXT NOT NULL
+    );
+    """
+,
+
+    # Listening Part 3
+    """
+    CREATE TABLE IF NOT EXISTS listening_part_3 (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        topic TEXT,
+        question TEXT,
+        correct_answer VARCHAR(10) NOT NULL,
+        audio_path TEXT
+    );
+    """,
+
+    # Listening Part 4
+    """
+    CREATE TABLE IF NOT EXISTS listening_part_4 (
+        id SERIAL PRIMARY KEY,
+        exam_id INTEGER REFERENCES exams(id) NOT NULL,
+        topic TEXT,
+        question TEXT,
+        correct_answer VARCHAR(10) NOT NULL,
+        audio_path TEXT,
+        option1 TEXT NOT NULL,
+        option2 TEXT NOT NULL,
+        option3 TEXT NOT NULL
+    );
+    """
+]
+
+# Thực thi từng câu lệnh
+for sql in create_tables:
+    cur.execute(sql)
+
+conn.commit()
+cur.close()
+conn.close()
+
+print("✅ Đã tạo xong tất cả các bảng cho hệ thống luyện thi Aptis.")
