@@ -59,7 +59,7 @@ import math
 
 async def get_exam_set(
     search: Optional[str] = None,
-    page: int = 0,
+    page: int = 1,
     limit: int = 100,
 ) -> Dict[str, Any]:
     conn = None
@@ -97,6 +97,7 @@ async def get_exam_set(
                 LIMIT %s OFFSET %s;
             """
             # thêm limit, offset vào params
+            
             cur.execute(data_sql, params + [limit, offset])
             rows = cur.fetchall()
 
