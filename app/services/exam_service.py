@@ -541,4 +541,98 @@ def update_exam_by_id(exam_id, json_content):
         if conn:
             conn.close()
             
+
+async def update_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_id: int,
+    descriptions: str, # Tiêu đề chung cho phần Reading này
+    time_limit_for_part: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("SELECT id FROM exams WHERE id = %s", (exam_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
+
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(
+            """
+            UPDATE Exams SET description = %s,  time_limit = %s, updated_at = now()
+            WHERE id = %s
+            RETURNING id, examset_id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (descriptions, time_limit_for_part, exam_id) 
+        )
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update exam record in database.")
         
+        exam_id = exam_record['id']
+        examset_id = exam_record['id']
+        print(f"UPDATE Exam (Reading Part) record with ID: {exam_id} for Exam ID: {examset_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{READING_FILES_DIR}/{excel_file.filename}"
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        reading_json_data = aptis_reading_to_json(saved_excel_file_path_str)
+        
+        update_exam_by_id(exam_id, reading_json_data)
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        # delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+    
