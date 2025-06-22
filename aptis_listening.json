@@ -1,0 +1,220 @@
+{
+    "part1": [
+        {
+            "question": "How many buildings will the town have?",
+            "audio_link": "https://drive.google.com/file/d/1r5ND2P-ybDc0ahaRIm1kehPy80QjBexR/view?usp=sharing",
+            "correct_answer": 1.0,
+            "options": [
+                "1000.0",
+                "2000.0",
+                "3000.0"
+            ]
+        },
+        {
+            "question": "What was the writer's first job?",
+            "audio_link": "https://drive.google.com/file/d/17bTHPCIVueeR4YdL9Z27KAw03QUYUT6v/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "cook",
+                "reporter",
+                "teacher"
+            ]
+        },
+        {
+            "question": "How did he adjust the meeting?",
+            "audio_link": "https://drive.google.com/file/d/1bcbGo2qa0sRuTijDhQnLB8Y1Qv1Ju3qZ/view?usp=sharing",
+            "correct_answer": 2.0,
+            "options": [
+                "cancel the meeting",
+                "having the meeting without him",
+                "having the meeting another day"
+            ]
+        },
+        {
+            "question": "What time is the meeting?",
+            "audio_link": "https://drive.google.com/file/d/1g6wP64PR16RmCaIr9sa3syRylc7QhvKx/view?usp=sharing",
+            "correct_answer": 2.0,
+            "options": [
+                "9.15",
+                "10.15",
+                "10.30"
+            ]
+        },
+        {
+            "question": "Why did he call his friend?",
+            "audio_link": "https://drive.google.com/file/d/1711eIzER1APUX6xoahqEFqf8a898fuvQ/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "To make an appointment",
+                "To say hello",
+                "Suggest a drink"
+            ]
+        },
+        {
+            "question": "What is the mother asking her daughter to buy?",
+            "audio_link": "https://drive.google.com/file/d/1dsIEuXVYpKLCdTeegDx8rzxPqHPSJWkn/view?usp=sharing",
+            "correct_answer": 1.0,
+            "options": [
+                "eggs",
+                "chocolates",
+                "bread"
+            ]
+        },
+        {
+            "question": "When do they meet?",
+            "audio_link": "https://drive.google.com/file/d/1tYLL6Hh6mLj72T3AW0IOiJP3T-we7xpp/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "8.00",
+                "9.00",
+                "10.00"
+            ]
+        },
+        {
+            "question": "Why can't she pick up her child?",
+            "audio_link": "https://drive.google.com/file/d/1Hl9OoS3YBa8JDwA3QC8jjC4v0d6r8sd-/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "meet her client",
+                "have an urgent meeting",
+                "stay late at the office"
+            ]
+        },
+        {
+            "question": "What movie does she recommend?",
+            "audio_link": "https://drive.google.com/file/d/13Syg9viy150a2SkCkwgTXUjfAbT8J6j-/view?usp=sharing",
+            "correct_answer": 2.0,
+            "options": [
+                "comedy film",
+                "action film",
+                "horror film"
+            ]
+        },
+        {
+            "question": "A man is calling his friend. Where is he?",
+            "audio_link": "https://drive.google.com/file/d/1vliuL7y3ZKLKpA_tIkiO_FpfZmoqgHLH/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "the park",
+                "the station",
+                "the town hall"
+            ]
+        },
+        {
+            "question": "What means of transport does he use to get to work?",
+            "audio_link": "https://drive.google.com/file/d/1ey-ktcMDoRCLP3Sl468XHLpYw9Kkxa5-/view?usp=sharing",
+            "correct_answer": 3.0,
+            "options": [
+                "by bus",
+                "by train",
+                "by car"
+            ]
+        },
+        {
+            "question": "What time do experts recommend eating fruit?",
+            "audio_link": "https://drive.google.com/file/d/1LZyi6LnO5Avs6xdxX9TUAxWEvZ-k93pP/view?usp=sharing",
+            "correct_answer": 1.0,
+            "options": [
+                "in the morning",
+                "in the afternoon",
+                "in the evening"
+            ]
+        },
+        {
+            "question": "Why does she wake up early?",
+            "audio_link": "https://drive.google.com/file/d/1LZyi6LnO5Avs6xdxX9TUAxWEvZ-k93pP/view?usp=sharing",
+            "correct_answer": 2.0,
+            "options": [
+                "to exercise",
+                "to have some quiet time",
+                "to do housework"
+            ]
+        }
+    ],
+    "part2": [
+        {
+            "topic": "Shopping habits",
+            "audio_link": "https://drive.google.com/file/d/1SmUDz2tl2gevazMBOB0bMFygcRORYduy/view?usp=sharing",
+            "a": 4,
+            "options": [
+                "It reduces waste",
+                "It is cheaper",
+                "There are more choices",
+                "It saves time",
+                "Products are delivered",
+                "phuc"
+            ],
+            "b": 2,
+            "c": 3,
+            "d": 6
+        }
+    ],
+    "part3": [
+        {
+            "topic": "Audition",
+            "questions": [
+                "Auditions are most important for an actor's career.",
+                "Actors tend to respond best to strong and engaging scripts",
+                "Theater acting and screen acting are quite different from each other.",
+                "Actors should be praised and recognized as much as possible."
+            ],
+            "correct_answers": [
+                "MAN",
+                "WOMAN",
+                "BOTH",
+                "MAN"
+            ],
+            "audio_link": "https://drive.google.com/file/d/1R0903PKOgrEtmMCZVn8-W9cVoPnKg9Jv/view?usp=sharing"
+        }
+    ],
+    "part4": [
+        {
+            "topic": "Listen to a city planner talk at a press conference about a new transport plan and answer the questions below.",
+            "audio_link": "https://drive.google.com/file/d/1IsFgLGWoGDRPis21Nx1UNn3emKJlb3PS/view?usp=sharing",
+            "questions": [
+                "What is his opinion of the plan overall?",
+                "What is his opinion of the role of the media?"
+            ],
+            "correct_answers": [
+                1.0,
+                2.0
+            ],
+            "options": [
+                [
+                    "It is very similar to previous community projects in the same area.",
+                    "It was prepared without proper consultation with the community.",
+                    "It does not represent the opinions of the whole community."
+                ],
+                [
+                    "He is critical of the media\u2019s reporting of the plan.",
+                    "He is surprised by the media\u2019s interest in the plan.",
+                    "He is confused by the media\u2019s reaction to the plan."
+                ]
+            ]
+        },
+        {
+            "topic": "Listen to a city planner talk at a press conference about a new transport plan and answer the questions below.",
+            "audio_link": "https://drive.google.com/file/d/1cROzYKByjyLauXFw1eracUvznPkgRp12/view?usp=sharing",
+            "questions": [
+                "What is his opinion of the plan overall?",
+                "What is his opinion of the role of the media?"
+            ],
+            "correct_answers": [
+                1.0,
+                2.0
+            ],
+            "options": [
+                [
+                    "It is very similar to previous community projects in the same area.",
+                    "It was prepared without proper consultation with the community.",
+                    "It does not represent the opinions of the whole community."
+                ],
+                [
+                    "He is critical of the media\u2019s reporting of the plan.",
+                    "He is surprised by the media\u2019s interest in the plan.",
+                    "He is confused by the media\u2019s reaction to the plan."
+                ]
+            ]
+        }
+    ]
+}

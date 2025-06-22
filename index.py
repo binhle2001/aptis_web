@@ -74,7 +74,10 @@ def insert_listening_part1_json(json_data, exam_id):
         
         os.makedirs('raw_files/listening', exist_ok=True)
         
-        for question_id, url in rows:
+        for row in rows:
+            # Skip non-http
+            qid = row["id"]
+            url = row["audio_path"]
             # Chuyển link Google Drive thành ID
             m = re.search(r'/d/([^/]+)/', url)
             if m:
@@ -87,7 +90,7 @@ def insert_listening_part1_json(json_data, exam_id):
             
             # Tạo đường dẫn lưu
             # Gdown sẽ tự detect extension, nhưng ta mặc định .mp3
-            local_fname = f"{exam_id}_part1_{question_id}.mp3"
+            local_fname = f"{exam_id}_part1_{qid}.mp3"
             local_path  = os.path.join('raw_files/listening', local_fname)
             
             # 3) Tải file bằng gdown
@@ -99,7 +102,7 @@ def insert_listening_part1_json(json_data, exam_id):
                 UPDATE listening_part_1
                    SET audio_path = %s
                  WHERE id = %s
-            """, (local_path, question_id))
+            """, (local_path, qid))
         
         conn.commit()
         return "success"
@@ -156,9 +159,9 @@ def insert_listening_part2_json(json_data, exam_id):
         records = cur.fetchall()
 
         os.makedirs('raw_files/listening', exist_ok=True)
-
         # 3) Download & cập nhật đường dẫn local
         for qid, url in records:
+            
             # tách file_id từ link Drive
             m = re.search(r'/d/([^/]+)/', url)
             if m:
@@ -170,14 +173,13 @@ def insert_listening_part2_json(json_data, exam_id):
             # đặt tên file
             ext = '.mp3'
             local_fname = f"{exam_id}_part2_{qid}{ext}"
-            local_path  = 'raw_files/listening/{local_fname}', local_fname
+            local_path  = f'raw_files/listening/{local_fname}'
+        
+            
+            gdown.download(download_url, output=local_path)
+                
+           
 
-            try:
-                gdown.download(download_url, output=local_path, quiet=True)
-                print(local_path)
-            except Exception:
-                # Nếu download thất bại, bỏ qua và giữ nguyên url gốc
-                continue
 
             # update đường dẫn trong DB
             cur.execute("""
@@ -240,14 +242,15 @@ def insert_listening_part3_json(json_data, exam_id):
         os.makedirs('raw_files/listening', exist_ok=True)
 
         # 3) Download & update đường dẫn local
-        for qid, url in records:
+        for row in records:
+            qid, url = row["id"], row["audio_path"]
             # skip nếu url không phải link
             if not url.startswith('http'):
                 continue
             m = re.search(r'/d/([^/]+)/', url)
             download_url = f'https://drive.google.com/uc?id={m.group(1)}' if m else url
             local_fname = f"{exam_id}_part3_{qid}.mp3"
-            local_path  = os.path.join('raw_files/listening', local_fname)
+            local_path  = f'raw_files/listening/{local_fname}'
             try:
                 gdown.download(download_url, output=local_path, quiet=True)
             except Exception:
@@ -256,7 +259,7 @@ def insert_listening_part3_json(json_data, exam_id):
                 cur.execute("""
                     UPDATE listening_part_3
                        SET audio_path = %s
-                     WHERE question_id = %s
+                     WHERE id = %s
                 """, (local_path, qid))
         conn.commit()
         return "success"
@@ -314,8 +317,11 @@ def insert_listening_part4_json(json_data, exam_id):
 
         os.makedirs('raw_files/listening', exist_ok=True)
 
-        # 3) Download & update đường dẫn local
-        for qid, url in records:
+        # 3) Download & update đường dẫn local\
+        
+        for row in records:
+            
+            qid, url = row["id"], row["audio_path"]
             # Skip non-http
             if not url.startswith('http'):
                 continue
@@ -325,12 +331,12 @@ def insert_listening_part4_json(json_data, exam_id):
 
             # đặt tên file, mặc định .mp3
             local_fname = f"{exam_id}_part4_{qid}.mp3"
-            local_path = os.path.join('raw_files/listening', local_fname)
+            local_path = f'raw_files/listening/{local_fname}'
 
             try:
                 gdown.download(download_url, output=local_path, quiet=True)
-            except Exception:
-                continue
+            except Exception as e:
+                raise e
 
             if os.path.exists(local_path):
                 cur.execute("""
@@ -348,8 +354,9 @@ def insert_listening_part4_json(json_data, exam_id):
     finally:
         cur.close()
         conn.close()
+        
 import json
 with open("aptis_listening.json", "r", encoding="utf-8") as f:
     json_data = json.load(f)
-print(insert_listening_part4_json(json_data["part4"], 1))
+print(insert_listening_part4_json(json_data["part4"], 2))
 

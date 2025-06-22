@@ -148,7 +148,7 @@ def aptis_listening_to_json(file_path):
     if 'part1' in wb.sheetnames:
         ws = wb['part1']
         part1_data = []
-        for row in ws.iter_rows(min_row=2, values_only=True):  # Bỏ qua header
+        for row in ws.iter_rows(min_row=2, values_only=True):
             if row[0]:  # Kiểm tra Question có tồn tại
                 item = {
                     "question": row[0],
@@ -164,72 +164,105 @@ def aptis_listening_to_json(file_path):
         ws = wb['part2']
         part2_data = []
         
-        # Lấy thông tin chung từ hàng 2 (hàng đầu tiên có dữ liệu)
+        # Lấy thông tin từ hàng đầu tiên có dữ liệu
         row1 = next(ws.iter_rows(min_row=2, max_row=2, values_only=True))
-        if row1[0]:  # Kiểm tra Topic có tồn tại
-            common_topic = row1[0]
-            common_audio = row1[1]
-            options = [str(opt) for opt in row1[3:9] if opt]  # Option_1 đến Option_6
-            
-            # Xử lý các hàng tiếp theo
-            for row in ws.iter_rows(min_row=3, values_only=True):
-                if row[2]:  # Kiểm tra Correct_Answer có tồn tại
-                    item = {
-                        "topic": common_topic,
-                        "audio_link": common_audio,
-                        "correct_answer": row[2],
-                        "options": options
-                    }
-                    part2_data.append(item)
+        
+        # Lấy các options từ cột D đến I
+        options = [str(opt) for opt in row1[3:9] if opt is not None]
+        
+        # Tạo object cho part2
+        part2_obj = {
+            "topic": row1[0],
+            "audio_link": row1[1],
+            "a": int(row1[2]) if isinstance(row1[2], float) else row1[2],
+            "options": options
+        }
+        
+        # Thêm các correct_answer từ các hàng tiếp theo
+        letters = ['b', 'c', 'd']
+        for i, row in enumerate(ws.iter_rows(min_row=3, values_only=True)):
+            if i >= len(letters):
+                break
+            if row[2] is not None:
+                # Chuyển đổi thành số nguyên nếu là float
+                value = row[2]
+                if isinstance(value, float):
+                    value = int(value)
+                part2_obj[letters[i]] = value
+        
+        part2_data.append(part2_obj)
         result['part2'] = part2_data
     
     # Xử lý part3
     if 'part3' in wb.sheetnames:
         ws = wb['part3']
         part3_data = []
-        current_topic = ""
-        current_audio = ""
+        current_group = None
         
-        for row in ws.iter_rows(min_row=2, values_only=True):  # Bỏ qua header
-            if row[0]:  # Cập nhật topic nếu có
-                current_topic = row[0]
-            if row[3]:  # Cập nhật audio link nếu có
-                current_audio = row[3]
-            
-            if row[1]:  # Chỉ xử lý khi có Question
-                item = {
-                    "topic": current_topic,
-                    "question": row[1],
-                    "correct_answer": row[2],
-                    "audio_link": current_audio
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            # Nếu có topic hoặc audio mới, tạo group mới
+            if row[0] or row[3]:
+                # Lưu group hiện tại nếu có
+                if current_group:
+                    part3_data.append(current_group)
+                
+                # Tạo group mới
+                current_group = {
+                    "topic": row[0],
+                    "questions": [],
+                    "correct_answers": [],
+                    "audio_link": row[3]
                 }
-                part3_data.append(item)
+            
+            # Thêm câu hỏi và câu trả lời vào group hiện tại
+            if row[1]:
+                current_group["questions"].append(row[1])
+                current_group["correct_answers"].append(row[2])
+        
+        # Lưu group cuối cùng
+        if current_group:
+            part3_data.append(current_group)
+        
         result['part3'] = part3_data
     
-    # Xử lý part4
+    # Xử lý part4 theo định dạng mới
     if 'part4' in wb.sheetnames:
         ws = wb['part4']
         part4_data = []
-        current_topic = ""
-        current_audio = ""
+        current_group = None
         
-        for row in ws.iter_rows(min_row=2, values_only=True):  # Bỏ qua header
-            if row[0]:  # Cập nhật topic nếu có
-                current_topic = row[0]
-            if row[1]:  # Cập nhật audio link nếu có
-                current_audio = row[1]
-            
-            if row[2]:  # Chỉ xử lý khi có Question
-                item = {
-                    "topic": current_topic,
-                    "audio_link": current_audio,
-                    "question": row[2],
-                    "correct_answer": row[3],
-                    "options": [str(row[4]), str(row[5]), str(row[6])]
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            # Nếu có topic hoặc audio mới, tạo group mới
+            if row[0] or row[1]:
+                # Lưu group hiện tại nếu có
+                if current_group:
+                    part4_data.append(current_group)
+                
+                # Tạo group mới
+                current_group = {
+                    "topic": row[0],
+                    "audio_link": row[1],
+                    "questions": [],
+                    "correct_answers": [],
+                    "options": []
                 }
-                part4_data.append(item)
+            
+            # Thêm câu hỏi, đáp án và lựa chọn vào group hiện tại
+            if row[2]:
+                current_group["questions"].append(row[2])
+                current_group["correct_answers"].append(row[3])
+                current_group["options"].append([
+                    str(row[4]),
+                    str(row[5]),
+                    str(row[6])
+                ])
+        
+        # Lưu group cuối cùng
+        if current_group:
+            part4_data.append(current_group)
+        
         result['part4'] = part4_data
-
+    
     return result
 
 
