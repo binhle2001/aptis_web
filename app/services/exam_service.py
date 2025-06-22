@@ -10,8 +10,10 @@ from app.helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_j
 from app.services.auth_service import get_db_connection
 READING_FILES_DIR = "raw_file/reading"
 LISTENING_FILES_DIR = "raw_file/listening"
+AUDIO_FILES_DIR = "raw_file/audio"
 os.makedirs(READING_FILES_DIR, exist_ok=True)
 os.makedirs(LISTENING_FILES_DIR, exist_ok=True)
+os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 def insert_reading_part1_json(json_data, exam_id):
     """
     Chèn dữ liệu Part 1 Reading từ JSON vào bảng reading_part_1.
@@ -218,7 +220,11 @@ def delete_exam_data(exam_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+            cur_validate.execute("SELECT id, exam_type FROM exams WHERE id = %s", (exam_id,))
+            row = cur_validate.fetchone()
+            if not row:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
         # Thứ tự xóa: bảng phụ → bảng chính (foreign key)
         tables = [
             'reading_part_1',
@@ -244,6 +250,7 @@ def delete_exam_data(exam_id):
         print(f"✅ Đã xóa toàn bộ dữ liệu của exam_id = {exam_id}")
     except Exception as e:
         print("❌ Lỗi khi xóa dữ liệu:", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Reading exam part with code '{exam_id}' Error.")
 
 async def create_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
     exam_set_id: int,
@@ -692,7 +699,7 @@ def insert_listening_part1_json(json_data, exam_id):
         """, (exam_id,))
         rows = cur.fetchall()
         
-        os.makedirs('raw_files/listening', exist_ok=True)
+        os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
         
         for row in rows:
             # Skip non-http
@@ -729,7 +736,7 @@ def insert_listening_part1_json(json_data, exam_id):
     
     except Exception as e:
         conn.rollback()
-        return f"error: {e}"
+        raise f"error: {e}"
     
     finally:
         cur.close()
@@ -815,7 +822,7 @@ def insert_listening_part2_json(json_data, exam_id):
 
     except Exception as e:
         conn.rollback()
-        return f"error: {e}"
+        raise f"error: {e}"
 
     finally:
         cur.close()
@@ -945,7 +952,10 @@ def insert_listening_part4_json(json_data, exam_id):
             
             qid, url = row["id"], row["audio_path"]
             # Skip non-http
+            qid = row["id"]
+            url = row["audio_path"]
             if not url.startswith('http'):
+                print("ngu")
                 continue
             # extract drive file ID
             m = re.search(r'/d/([^/]+)/', url)
@@ -971,7 +981,7 @@ def insert_listening_part4_json(json_data, exam_id):
 
     except Exception as e:
         conn.rollback()
-        return f"error: {e}"
+        raise f"error: {e}"
 
     finally:
         cur.close()

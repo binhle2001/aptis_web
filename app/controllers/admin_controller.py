@@ -188,7 +188,7 @@ async def create_reading_exam_for_set_endpoint(
     ),
     file: UploadFile = File(
         ..., 
-        description="The PDF file (.pdf) containing the reading exam content."
+        description="The Excel file containing the reading exam content."
     )
 ):
     """
@@ -282,7 +282,8 @@ async def get_exam_set_endpoint(
 
 @router.patch(
     "/exam-sets/{exam_set_id}/activate",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -292,14 +293,15 @@ async def delete_exam_set_endpoint(
     Soft‑delete một ExamSet (chỉ set is_active = false).
     """
     
-    success = await exam_set_service.reactivate_exam_set(exam_set_id)
+    success =  exam_set_service.reactivate_exam_set(exam_set_id)
     # 204 No Content
     
     return MessageResponseSchema(message = f"Exam set {exam_set_id} deactivated")
     
 @router.patch(
     "/exam-sets/{exam_set_id}/deactivate",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -314,7 +316,8 @@ async def delete_exam_set_endpoint(
 
 @router.delete(
     "/exam-sets/{exam_set_id}",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -541,5 +544,5 @@ async def get_exam_set_endpoint(
     exam_id: int,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
 ):
-    exam_set = exam_service.delete_exam_(exam_id)
+    exam_set = exam_service.delete_exam_data(exam_id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
