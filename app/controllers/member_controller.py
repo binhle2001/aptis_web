@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
 from app.core.deps import get_current_member_user
 from app.schemas.auth_schema import TokenSchema, UserLoginSchema
+from app.schemas.exam_schema import AudioPath
 from app.schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
 from app.services import auth_service, exam_service, exam_set_service
 
@@ -51,3 +52,12 @@ async def get_exam_set_endpoint(
 ):
     exam_set = exam_service.get_exam_by_id(exam__id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
+
+@router.get("/exam-audio")
+async def get_audio_path_listening(
+    item: AudioPath,
+    current_admin: Annotated[dict, Depends(get_current_member_user)]
+):
+    file = exam_service.load_audio_as_base64(item.audio_path)
+    response = {"audio": file}
+    return JSONResponse(status_code=status.HTTP_200_OK, content = response)

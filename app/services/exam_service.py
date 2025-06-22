@@ -1,3 +1,4 @@
+import base64
 import re
 import shutil
 from typing import Optional
@@ -6,11 +7,12 @@ import gdown
 import psycopg2
 import os
 from psycopg2.extras import execute_values
+import requests
 from app.helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json
 from app.services.auth_service import get_db_connection
-READING_FILES_DIR = "raw_file/reading"
-LISTENING_FILES_DIR = "raw_file/listening"
-AUDIO_FILES_DIR = "raw_file/audio"
+READING_FILES_DIR = "/app/raw_file/reading"
+LISTENING_FILES_DIR = "/app/raw_file/listening"
+AUDIO_FILES_DIR = "/app/raw_file/audio"
 os.makedirs(READING_FILES_DIR, exist_ok=True)
 os.makedirs(LISTENING_FILES_DIR, exist_ok=True)
 os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
@@ -270,7 +272,7 @@ async def create_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc 
         if not cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
         cur_validate.execute(
-            "SELECT id FROM exams WHERE exam_code = %s OR (examset_id = %s AND exam_type = %s) ", (exam_part_code, exam_set_id, 'reading')
+            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'reading')
         ) 
         if cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Reading exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
@@ -718,12 +720,14 @@ def insert_listening_part1_json(json_data, exam_id):
             # Tạo đường dẫn lưu
             # Gdown sẽ tự detect extension, nhưng ta mặc định .mp3
             local_fname = f"{exam_id}_part1_{qid}.mp3"
-            local_path  = os.path.join('raw_files/listening', local_fname)
+            local_path  = f'/app/raw_file/audio/{local_fname}'
             
             # 3) Tải file bằng gdown
             # quiet=False để hiện progress, bạn có thể set True nếu không cần
-            gdown.download(download_url, output=local_path, quiet=False)
-            
+            try:
+                gdown.download(download_url, output=local_path, quiet=False)
+            except:
+                print("đéo thể tải file về")
             # 4) Cập nhật lại audio_path thành đường dẫn local
             cur.execute("""
                 UPDATE listening_part_1
@@ -741,6 +745,7 @@ def insert_listening_part1_json(json_data, exam_id):
     finally:
         cur.close()
         conn.close()
+        
 def insert_listening_part2_json(json_data, exam_id):
     """
     json_data: list of dict có keys: topic, audio_link, a, b, c, d, options[6]
@@ -787,7 +792,6 @@ def insert_listening_part2_json(json_data, exam_id):
         """, (exam_id,))
         records = cur.fetchall()
         
-        os.makedirs('raw_files/listening', exist_ok=True)
         # 3) Download & cập nhật đường dẫn local
         for qid, url in records:
             
@@ -802,10 +806,13 @@ def insert_listening_part2_json(json_data, exam_id):
             # đặt tên file
             ext = '.mp3'
             local_fname = f"{exam_id}_part2_{qid}{ext}"
-            local_path  = f'raw_files/listening/{local_fname}'
+            local_path  = f'/app/raw_file/audio/{local_fname}'
         
             
-            gdown.download(download_url, output=local_path)
+            try:
+                gdown.download(download_url, output=local_path, quiet=False)
+            except:
+                print("đéo thể tải file về")
                 
            
 
@@ -868,7 +875,7 @@ def insert_listening_part3_json(json_data, exam_id):
         """, (exam_id,))
         records = cur.fetchall()
 
-        os.makedirs('raw_files/listening', exist_ok=True)
+        
 
         # 3) Download & update đường dẫn local
         for row in records:
@@ -879,7 +886,7 @@ def insert_listening_part3_json(json_data, exam_id):
             m = re.search(r'/d/([^/]+)/', url)
             download_url = f'https://drive.google.com/uc?id={m.group(1)}' if m else url
             local_fname = f"{exam_id}_part3_{qid}.mp3"
-            local_path  = f'raw_files/listening/{local_fname}'
+            local_path  = f'/app/raw_file/audio/{local_fname}'
             try:
                 gdown.download(download_url, output=local_path, quiet=True)
             except Exception:
@@ -944,7 +951,7 @@ def insert_listening_part4_json(json_data, exam_id):
         """, (exam_id,))
         records = cur.fetchall()
 
-        os.makedirs('raw_files/listening', exist_ok=True)
+    
 
         # 3) Download & update đường dẫn local\
         
@@ -963,11 +970,12 @@ def insert_listening_part4_json(json_data, exam_id):
 
             # đặt tên file, mặc định .mp3
             local_fname = f"{exam_id}_part4_{qid}.mp3"
-            local_path = f'raw_files/listening/{local_fname}'
+            local_path = f'/app/raw_file/audio/{local_fname}'
 
             try:
                 gdown.download(download_url, output=local_path, quiet=True)
             except Exception as e:
+                print("đéo thể tải file path 4 về")
                 raise e
 
             if os.path.exists(local_path):
@@ -1005,7 +1013,7 @@ async def create_listening_exam_from_excel( # Đổi tên từ _from_excel hoặ
         if not cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
         cur_validate.execute(
-            "SELECT id FROM exams WHERE exam_code = %s OR (examset_id = %s AND exam_type = %s) ", (exam_part_code, exam_set_id, 'listening')
+            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'listening')
         ) 
         if cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Reading exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
@@ -1122,11 +1130,11 @@ async def update_listening_exam_from_excel( # Đổi tên từ _from_excel hoặ
             """,
             (exam_id,) 
         )
-        print("ngungungu")
+   
         exam_record = cur.fetchone()
         if not exam_record:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update exam record in database.")
-        print(exam_record)
+        
         exam_id = exam_record['id']
         examset_id = exam_record['examset_id']
         print(f"UPDATE Exam (Listening Part) record with ID: {exam_id} for Exam ID: {examset_id}")
@@ -1298,3 +1306,91 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
     finally:
         cur.close()
         conn.close()
+
+def load_audio_as_base64(path_or_url: str) -> str:
+    """
+    Nếu path_or_url bắt đầu bằng http thì tải file về memory,
+    ngược lại mở file local.
+    Trả về base64-encoded string.
+    """
+    try:
+        if path_or_url.lower().startswith("http"):
+            resp = requests.get(path_or_url)
+            resp.raise_for_status()
+            data = resp.content
+        else:
+            with open(path_or_url, "rb") as f:
+                data = f.read()
+        return base64.b64encode(data).decode("utf-8")
+    except Exception as e:
+        # Tùy nhu cầu, có thể raise hoặc trả về None
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail      = f"Cannot load audio [{path_or_url}]: {e}"
+        )
+
+def _ensure_drive_url(url: str) -> str:
+    m = re.search(r'/d/([^/]+)/', url)
+    return f"https://drive.google.com/uc?id={m.group(1)}" if m else url
+
+
+def _download_file(url: str, local_path: str):
+    if os.path.exists(local_path):
+        return
+    try:
+        resp = requests.get(url, stream=True)
+        resp.raise_for_status()
+        with open(local_path, 'wb') as f:
+            for chunk in resp.iter_content(1024 * 8):
+                f.write(chunk)
+        print(f"Downloaded: {url} -> {local_path}")
+    except Exception as e:
+        print(f"Download failed [{url}]: {e}")
+
+# --- Main download function
+def _ensure_drive_url(url: str) -> str:
+    m = re.search(r'/d/([^/]+)/', url)
+    if m:
+        return f"https://drive.google.com/uc?id={m.group(1)}"
+    return url
+
+# --- Main download function
+def download_all_listening():
+    conn = get_db_connection()
+    cur  = conn.cursor()
+    os.makedirs('raw_files/listening', exist_ok=True)
+
+    for part in range(1, 5):
+        table = f"listening_part_{part}"
+        cur.execute(f"SELECT id, exam_id, audio_path FROM {table} WHERE audio_path IS NOT NULL ORDER BY id")
+        rows = cur.fetchall()
+        for row in rows:
+            rec_id, exam_id, path_in = row['id'], row['exam_id'],  row['audio_path']
+            # Build download URL
+            if path_in.lower().startswith('http'):
+                download_url = _ensure_drive_url(path_in)
+            else:
+                download_url = None
+
+            # Local file path
+            ext = os.path.splitext(download_url or path_in)[1] or '.mp3'
+            local_fname = f"{exam_id}_part{part}_{rec_id}.mp3"
+            local_path  = f'/app/raw_file/audio/{local_fname}'
+
+            # Download via gdown for HTTP URLs, skip local
+            if download_url:
+                try:
+                    gdown.download(download_url, output=local_path, quiet=False)
+                    print(f"Downloaded: {download_url} -> {local_path}")
+                except Exception as e:
+                    print(f"Failed to download {download_url}: {e}")
+            else:
+                # Non-HTTP, assume local path, check exist
+                if not os.path.exists(path_in):
+                    print(f"Missing local file: {path_in}")
+                else:
+                    print(f"Local file exists: {path_in}")
+
+    conn.commit()
+    cur.close()
+    conn.close()

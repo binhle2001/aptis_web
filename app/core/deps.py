@@ -66,7 +66,7 @@ async def get_current_admin_user(
 async def get_current_member_user(
     current_user: Annotated[dict, Depends(get_current_active_user)]
 ) -> dict:
-    if current_user.get("role") != "member":
+    if current_user.get("role") != "member" and current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operation not permitted: Requires admin privileges"

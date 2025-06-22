@@ -57,3 +57,10 @@ class ExamReadingUpdate(BaseModel):
         json_schema_extra = {
             "json_content": {}
         }
+        
+class AudioPath(BaseModel):
+    audio_path: str = Field(..., example="audio_path")
+    class Config:
+        json_schema_extra = {
+            "audio_path": {}
+        }
