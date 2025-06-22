@@ -270,7 +270,7 @@ async def create_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc 
         if not cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
         cur_validate.execute(
-            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'reading')
+            "SELECT id FROM exams WHERE exam_code = %s OR (examset_id = %s AND exam_type = %s) ", (exam_part_code, exam_set_id, 'reading')
         ) 
         if cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Reading exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
@@ -1005,7 +1005,7 @@ async def create_listening_exam_from_excel( # Đổi tên từ _from_excel hoặ
         if not cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
         cur_validate.execute(
-            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'listening')
+            "SELECT id FROM exams WHERE exam_code = %s OR (examset_id = %s AND exam_type = %s) ", (exam_part_code, exam_set_id, 'listening')
         ) 
         if cur_validate.fetchone():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Reading exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
