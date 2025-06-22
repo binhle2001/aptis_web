@@ -2,11 +2,11 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import timedelta
-from app.helpers.common import get_env_var
+from helpers.common import get_env_var
 from fastapi import HTTPException, status
-
-from app.schemas.auth_schema import UserLoginSchema
-from app.core.security import (
+import time
+from schemas.auth_schema import UserLoginSchema
+from core.security import (
     verify_password,
     create_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -23,24 +23,26 @@ DB_PORT = get_env_var("DB", "DB_PORT")
 
 
 def get_db_connection():
-    try:
-        conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT,
-            cursor_factory=RealDictCursor # Trả về kết quả dạng dictionary
-        )
-        return conn
-    except psycopg2.OperationalError as e:
-        print(f"Database connection error: {e}")
-        # Trong một ứng dụng thực tế, bạn có thể muốn log lỗi này
-        # và có cơ chế retry hoặc báo lỗi nghiêm trọng hơn.
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service is unavailable."
-        )
+    for i in range(10):
+        try:
+            conn = psycopg2.connect(
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                host=DB_HOST,
+                port=DB_PORT,
+                cursor_factory=RealDictCursor # Trả về kết quả dạng dictionary
+            )
+            return conn
+        except psycopg2.OperationalError as e:
+            print(f"Database connection error: {e}")
+            # Trong một ứng dụng thực tế, bạn có thể muốn log lỗi này
+            # và có cơ chế retry hoặc báo lỗi nghiêm trọng hơn.
+            time.sleep(2)
+    raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service is unavailable."
+            )
 
 
 async def login_for_access_token(form_data: UserLoginSchema):

@@ -3,11 +3,11 @@ from typing import Annotated # Python 3.9+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
-from app.schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
-from app.services import user_service, exam_service, exam_set_service 
-from app.core.deps import get_current_admin_user # Dependency để xác thực Admin
-from app.schemas.exam_schema import ExamCreateResponseSchema, ExamReadingUpdate
-from app.schemas.exam_set_schema import ExamSetCreateSchema, ExamSetListResponseSchema, ExamSetResponseSchema
+from schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
+from services import user_service, exam_service, exam_set_service 
+from core.deps import get_current_admin_user # Dependency để xác thực Admin
+from schemas.exam_schema import ExamCreateResponseSchema, ExamReadingUpdate
+from schemas.exam_set_schema import ExamSetCreateSchema, ExamSetListResponseSchema, ExamSetResponseSchema
 
 router = APIRouter(
     prefix="/api/admin",
@@ -89,7 +89,7 @@ async def deactivate_user_endpoint(
         )
 
 # ... (imports và các hàm đã có) ...
-# from app.schemas.user_schema import MessageResponseSchema # Đã có
+# fromschemas.user_schema import MessageResponseSchema # Đã có
 
 # ... (router definition và các endpoint khác) ...
 

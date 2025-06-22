@@ -3,12 +3,12 @@
 # Ví dụ hàm create:
 import psycopg2
 from fastapi import HTTPException, status
-from app.schemas.exam_set_schema import ExamSetCreateSchema
-from app.schemas.user_schema import MessageResponseSchema
-from app.services.auth_service import get_db_connection
+from schemas.exam_set_schema import ExamSetCreateSchema
+from schemas.user_schema import MessageResponseSchema
+from services.auth_service import get_db_connection
 from typing import Optional, Dict, Any, List
 
-from app.services.exam_service import delete_exam_data
+from services.exam_service import delete_exam_data
 async def create_exam_set(set_data: ExamSetCreateSchema, created_by_user_id: int) -> dict:
     
     conn = None

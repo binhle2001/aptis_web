@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện hơn UserLoginSchema cho form data
 
-from app.schemas.auth_schema import TokenSchema, UserLoginSchema
-from app.services import auth_service
+from schemas.auth_schema import TokenSchema, UserLoginSchema
+from services import auth_service
 
 router = APIRouter(
     prefix="/api/auth",

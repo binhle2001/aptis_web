@@ -8,8 +8,8 @@ import psycopg2
 import os
 from psycopg2.extras import execute_values
 import requests
-from app.helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json
-from app.services.auth_service import get_db_connection
+from helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json
+from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
 LISTENING_FILES_DIR = "/app/raw_file/listening"
 AUDIO_FILES_DIR = "/app/raw_file/audio"
@@ -693,47 +693,8 @@ def insert_listening_part1_json(json_data, exam_id):
             ))
         conn.commit()
         
-        # 2) Select lại các bản ghi mới insert
-        cur.execute("""
-            SELECT id, audio_path
-              FROM listening_part_1
-             WHERE exam_id = %s
-        """, (exam_id,))
-        rows = cur.fetchall()
-        
-        os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
-        
-        for row in rows:
-            # Skip non-http
-            qid = row["id"]
-            url = row["audio_path"]
-            # Chuyển link Google Drive thành ID
-            m = re.search(r'/d/([^/]+)/', url)
-            if m:
-                file_id = m.group(1)
-                # gdown format: "https://drive.google.com/uc?id=<file_id>"
-                download_url = f'https://drive.google.com/uc?id={file_id}'
-                
-            else:
-                download_url = url
-            
-            # Tạo đường dẫn lưu
-            # Gdown sẽ tự detect extension, nhưng ta mặc định .mp3
-            local_fname = f"{exam_id}_part1_{qid}.mp3"
-            local_path  = f'/app/raw_file/audio/{local_fname}'
-            
-            # 3) Tải file bằng gdown
-            # quiet=False để hiện progress, bạn có thể set True nếu không cần
-            try:
-                gdown.download(download_url, output=local_path, quiet=False)
-            except:
-                print("đéo thể tải file về")
-            # 4) Cập nhật lại audio_path thành đường dẫn local
-            cur.execute("""
-                UPDATE listening_part_1
-                   SET audio_path = %s
-                 WHERE id = %s
-            """, (local_path, qid))
+
+
         
         conn.commit()
         return "success"
@@ -1239,7 +1200,6 @@ def _ensure_drive_url(url: str) -> str:
 def download_all_listening():
     conn = get_db_connection()
     cur  = conn.cursor()
-    os.makedirs('raw_files/listening', exist_ok=True)
 
     for part in range(1, 5):
         table = f"listening_part_{part}"

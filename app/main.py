@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from app.helpers.middlewares import catch_exceptions_middleware
-from app.controllers import auth_controller, admin_controller, member_controller # Import admin_controller
+from helpers.middlewares import catch_exceptions_middleware
+from controllers import auth_controller, admin_controller, member_controller # Import admin_controller
 # Import các routers khác nếu có
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.services.exam_service import download_all_listening
+from services.exam_service import download_all_listening
 
 bearer_scheme = HTTPBearer()
 
@@ -35,7 +35,7 @@ async def root():
 def read_secure_data(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     return {"token": credentials.credentials}
 # Nếu bạn muốn chạy hàm tạo user mẫu khi khởi động app (CHỈ DÀNH CHO DEV)
-# from app.services.auth_service import create_sample_user
+# fromservices.auth_service import create_sample_user
 # import asyncio
 
 # @app.on_event("startup")

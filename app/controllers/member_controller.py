@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện hơn UserLoginSchema cho form data
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
-from app.core.deps import get_current_member_user
-from app.schemas.auth_schema import TokenSchema, UserLoginSchema
-from app.schemas.exam_schema import AudioPath
-from app.schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
-from app.services import auth_service, exam_service, exam_set_service
+from core.deps import get_current_member_user
+from schemas.auth_schema import TokenSchema, UserLoginSchema
+from schemas.exam_schema import AudioPath
+from schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
+from services import auth_service, exam_service, exam_set_service
 
 router = APIRouter(
     prefix="/api/user",

@@ -4,9 +4,9 @@ from psycopg2.extras import RealDictCursor
 from fastapi import HTTPException, status
 
 
-from app.schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema
-from app.core.security import get_password_hash
-from app.services.auth_service import get_db_connection # Tái sử dụng
+from schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema
+from core.security import get_password_hash
+from services.auth_service import get_db_connection # Tái sử dụng
 from typing import List, Dict, Any, Optional
 
 

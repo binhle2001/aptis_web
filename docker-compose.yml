@@ -29,7 +29,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./app:/app/app # Mount thư mục app để live reload khi dev
+      - ./app:/app # Mount thư mục app để live reload khi dev
     ports:
       - 5055:5055 # APP_PORT từ .env hoặc mặc định 5055
     # CMD trong Dockerfile sẽ được sử dụng

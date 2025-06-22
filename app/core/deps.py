@@ -2,8 +2,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
-from app.services.auth_service import get_db_connection
-from app.core.security import decode_access_token, TokenData
+from services.auth_service import get_db_connection
+from core.security import decode_access_token, TokenData
 
 security = HTTPBearer()
 
