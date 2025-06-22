@@ -546,3 +546,6 @@ async def get_exam_set_endpoint(
 ):
     exam_set = exam_service.delete_exam_data(exam_id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
+
+
+

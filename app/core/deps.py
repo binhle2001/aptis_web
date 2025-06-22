@@ -61,3 +61,14 @@ async def get_current_admin_user(
             detail="Operation not permitted: Requires admin privileges"
         )
     return current_user
+
+# Dependency để kiểm tra role Admin
+async def get_current_member_user(
+    current_user: Annotated[dict, Depends(get_current_active_user)]
+) -> dict:
+    if current_user.get("role") != "member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation not permitted: Requires admin privileges"
+        )
+    return current_user

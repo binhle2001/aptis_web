@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.helpers.middlewares import catch_exceptions_middleware
-from app.controllers import auth_controller, admin_controller # Import admin_controller
+from app.controllers import auth_controller, admin_controller, member_controller # Import admin_controller
 # Import các routers khác nếu có
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -20,6 +20,7 @@ app = FastAPI(
 # Include routers
 app.include_router(auth_controller.router)
 app.include_router(admin_controller.router) # Thêm admin router
+app.include_router(member_controller.router)
 # ...
 
 @app.get("/")
