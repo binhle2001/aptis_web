@@ -53,7 +53,7 @@ async def get_exam_set_endpoint(
     exam_set = exam_service.get_exam_by_id(exam__id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
-@router.get("/exam-audio")
+@router.post("/exam-audio")
 async def get_audio_path_listening(
     item: AudioPath,
     current_admin: Annotated[dict, Depends(get_current_member_user)]
