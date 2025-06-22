@@ -692,50 +692,6 @@ def insert_listening_part1_json(json_data, exam_id):
                 exam_id, q, link, ans, opt1, opt2, opt3
             ))
         conn.commit()
-        
-        # 2) Select lại các bản ghi mới insert
-        cur.execute("""
-            SELECT id, audio_path
-              FROM listening_part_1
-             WHERE exam_id = %s
-        """, (exam_id,))
-        rows = cur.fetchall()
-        
-        os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
-        
-        for row in rows:
-            # Skip non-http
-            qid = row["id"]
-            url = row["audio_path"]
-            # Chuyển link Google Drive thành ID
-            m = re.search(r'/d/([^/]+)/', url)
-            if m:
-                file_id = m.group(1)
-                # gdown format: "https://drive.google.com/uc?id=<file_id>"
-                download_url = f'https://drive.google.com/uc?id={file_id}'
-                
-            else:
-                download_url = url
-            
-            # Tạo đường dẫn lưu
-            # Gdown sẽ tự detect extension, nhưng ta mặc định .mp3
-            local_fname = f"{exam_id}_part1_{qid}.mp3"
-            local_path  = f'/app/raw_file/audio/{local_fname}'
-            
-            # 3) Tải file bằng gdown
-            # quiet=False để hiện progress, bạn có thể set True nếu không cần
-            try:
-                gdown.download(download_url, output=local_path, quiet=False)
-            except:
-                print("đéo thể tải file về")
-            # 4) Cập nhật lại audio_path thành đường dẫn local
-            cur.execute("""
-                UPDATE listening_part_1
-                   SET audio_path = %s
-                 WHERE id = %s
-            """, (local_path, qid))
-        
-        conn.commit()
         return "success"
     
     except Exception as e:
@@ -782,51 +738,7 @@ def insert_listening_part2_json(json_data, exam_id):
                 o1, o2, o3, o4, o5, o6
             ))
         conn.commit()
-
-        # 2) Lấy lại các bản ghi cần download (chỉ những bản ghi có audio_path bắt đầu bằng http)
-        cur.execute("""
-            SELECT id, audio_path
-              FROM listening_part_2
-             WHERE exam_id = %s
-               AND audio_path LIKE 'http%%'
-        """, (exam_id,))
-        records = cur.fetchall()
-        
-        # 3) Download & cập nhật đường dẫn local
-        for qid, url in records:
-            
-            # tách file_id từ link Drive
-            m = re.search(r'/d/([^/]+)/', url)
-            if m:
-                file_id = m.group(1)
-                download_url = f'https://drive.google.com/uc?id={file_id}'
-            else:
-                download_url = url
-
-            # đặt tên file
-            ext = '.mp3'
-            local_fname = f"{exam_id}_part2_{qid}{ext}"
-            local_path  = f'/app/raw_file/audio/{local_fname}'
-        
-            
-            try:
-                gdown.download(download_url, output=local_path, quiet=False)
-            except:
-                print("đéo thể tải file về")
-                
-           
-
-
-            # update đường dẫn trong DB
-            cur.execute("""
-                UPDATE listening_part_2
-                   SET audio_path = %s
-                 WHERE id = %s
-            """, (local_path, qid))
-
-        conn.commit()
         return "success"
-
     except Exception as e:
         conn.rollback()
         raise f"error: {e}"
@@ -866,38 +778,6 @@ def insert_listening_part3_json(json_data, exam_id):
                 ))
         conn.commit()
 
-        # 2) Lấy lại id và audio_path ban đầu
-        cur.execute("""
-            SELECT id, audio_path
-              FROM listening_part_3
-             WHERE exam_id = %s
-               AND audio_path LIKE 'http%%'
-        """, (exam_id,))
-        records = cur.fetchall()
-
-        
-
-        # 3) Download & update đường dẫn local
-        for row in records:
-            qid, url = row["id"], row["audio_path"]
-            # skip nếu url không phải link
-            if not url.startswith('http'):
-                continue
-            m = re.search(r'/d/([^/]+)/', url)
-            download_url = f'https://drive.google.com/uc?id={m.group(1)}' if m else url
-            local_fname = f"{exam_id}_part3_{qid}.mp3"
-            local_path  = f'/app/raw_file/audio/{local_fname}'
-            try:
-                gdown.download(download_url, output=local_path, quiet=True)
-            except Exception:
-                continue
-            if os.path.exists(local_path):
-                cur.execute("""
-                    UPDATE listening_part_3
-                       SET audio_path = %s
-                     WHERE id = %s
-                """, (local_path, qid))
-        conn.commit()
         return "success"
 
     except Exception as e:
@@ -941,50 +821,7 @@ def insert_listening_part4_json(json_data, exam_id):
                     o1, o2, o3
                 ))
         conn.commit()
-
-        # 2) Lấy lại id và audio_path ban đầu
-        cur.execute("""
-            SELECT id, audio_path
-              FROM listening_part_4
-             WHERE exam_id = %s
-               AND audio_path LIKE 'http%%'
-        """, (exam_id,))
-        records = cur.fetchall()
-
-    
-
-        # 3) Download & update đường dẫn local\
         
-        for row in records:
-            
-            qid, url = row["id"], row["audio_path"]
-            # Skip non-http
-            qid = row["id"]
-            url = row["audio_path"]
-            if not url.startswith('http'):
-                print("ngu")
-                continue
-            # extract drive file ID
-            m = re.search(r'/d/([^/]+)/', url)
-            download_url = f'https://drive.google.com/uc?id={m.group(1)}' if m else url
-
-            # đặt tên file, mặc định .mp3
-            local_fname = f"{exam_id}_part4_{qid}.mp3"
-            local_path = f'/app/raw_file/audio/{local_fname}'
-
-            try:
-                gdown.download(download_url, output=local_path, quiet=True)
-            except Exception as e:
-                print("đéo thể tải file path 4 về")
-                raise e
-
-            if os.path.exists(local_path):
-                cur.execute("""
-                    UPDATE listening_part_4
-                       SET audio_path = %s
-                     WHERE id = %s
-                """, (local_path, qid))
-        conn.commit()
         return "success"
 
     except Exception as e:
