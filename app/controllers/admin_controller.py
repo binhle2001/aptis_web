@@ -188,7 +188,7 @@ async def create_reading_exam_for_set_endpoint(
     ),
     file: UploadFile = File(
         ..., 
-        description="The PDF file (.pdf) containing the reading exam content."
+        description="The Excel file containing the reading exam content."
     )
 ):
     """
@@ -282,7 +282,8 @@ async def get_exam_set_endpoint(
 
 @router.patch(
     "/exam-sets/{exam_set_id}/activate",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -292,14 +293,15 @@ async def delete_exam_set_endpoint(
     Soft‑delete một ExamSet (chỉ set is_active = false).
     """
     
-    success = await exam_set_service.reactivate_exam_set(exam_set_id)
+    success =  exam_set_service.reactivate_exam_set(exam_set_id)
     # 204 No Content
     
     return MessageResponseSchema(message = f"Exam set {exam_set_id} deactivated")
     
 @router.patch(
     "/exam-sets/{exam_set_id}/deactivate",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -314,7 +316,8 @@ async def delete_exam_set_endpoint(
 
 @router.delete(
     "/exam-sets/{exam_set_id}",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponseSchema
 )
 async def delete_exam_set_endpoint(
     exam_set_id: int,
@@ -405,3 +408,99 @@ async def update_reading_exam_for_set_endpoint(
         # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
         print(f"Unexpected error in controller: {e_main}")
         raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")
+
+
+@router.post(
+    "/exam-sets/{exam_set_id}/listening-exam", 
+    response_model=ExamCreateResponseSchema, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a listening Exam Part for an Exam Set" # Thêm summary cho Swagger
+)
+async def create_listening_exam_for_set_endpoint(
+    exam_set_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)],
+    exam_part_code: str = Form(
+        ..., 
+        description="Unique code for this listening part within the exam set (e.g., L001_S1).",
+        example="LT_SET1_PART"
+    ),
+    title_for_part: str = Form(
+        ..., 
+        description="Title for this listening part (e.g., 'Listening Section - Aptis General Set 1').",
+        example="listening - Aptis Test Alpha"
+    ),
+    time_limit_minutes_for_part: int = Form(
+        ..., 
+        gt=0, 
+        description="Time limit in minutes specifically for this listening part.",
+        example=60
+    ),
+    file: UploadFile = File(
+        ..., 
+        description="The Excel file containing the listening exam content."
+    )
+):
+    """
+    Allows an Admin to upload a PDF file to create a new listening exam part
+    and associate it with an existing ExamSet.
+
+    - **exam_set_id**: The ID of the parent ExamSet.
+    - **exam_part_code**: A unique code for this specific listening exam (e.g., listening_01).
+    - **title_for_part**: The title for this listening section.
+    - **time_limit_minutes_for_part**: Duration in minutes for this listening section.
+    - **file**: The PDF document for the exam.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
+        )
+
+    created_by_user_id = current_admin['id']
+    
+    try:
+        exam_details_dict = await exam_service.create_listening_exam_from_excel(
+            exam_set_id=exam_set_id,
+            exam_part_code=exam_part_code,
+            descriptions=title_for_part,
+            time_limit_for_part=time_limit_minutes_for_part,
+            excel_file=file,
+            created_by_user_id=created_by_user_id
+        )
+        # exam_details_dict bây giờ nên chứa các trường khớp với ExamCreateResponseSchema
+        # ví dụ: exam_id (của phần thi), exam_code (của phần thi), title (của phần thi), 
+        # exam_type, time_limit_minutes (của phần thi)
+        
+        # Tạo response object từ Pydantic model
+        # Đảm bảo các key trong exam_details_dict khớp với các field của ExamCreateResponseSchema
+        # Hoặc ExamCreateResponseSchema có thể cần được điều chỉnh.
+        # Giả sử exam_details_dict trả về:
+        # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'listening', 'time_limit_minutes': ...}
+        
+        return ExamCreateResponseSchema(
+            exam_id=exam_details_dict['id'],
+            exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
+            title=exam_details_dict['description'],         # Đây là title_for_part
+            exam_type=exam_details_dict['exam_type'],
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
+            message=f"Reading exam part '{exam_part_code}' created successfully for ExamSet ID {exam_set_id}."
+        )
+    except HTTPException as e:
+        # Lỗi đã được xử lý và ném lại từ service, hoặc lỗi validation ở đây
+        raise e
+    except Exception as e_main:
+        # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
+        print(f"Unexpected error in controller: {e_main}")
+        raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")
+
+@router.delete("/exam/{exam_id}",
+    response_model=MessageResponseSchema, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a listening Exam Part for an Exam Set" # Thêm summary cho Swagger
+)
+async def delete_listening_exam_for_set_endpoint(
+    exam_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+): 
+    exam_service.delete_exam_data(exam_id)
+    return MessageResponseSchema(message = "✅ Đã xóa toàn bộ dữ liệu của exam_id = {exam_id}")
