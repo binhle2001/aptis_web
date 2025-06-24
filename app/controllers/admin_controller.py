@@ -352,9 +352,6 @@ async def update_reading_exam_for_set_endpoint(
     and associate it with an existing ExamSet.
 
     - **exam_set_id**: The ID of the parent ExamSet.
-    - **exam_part_code**: A unique code for this specific reading exam (e.g., READING_01).
-    - **title_for_part**: The title for this reading section.
-    - **time_limit_minutes_for_part**: Duration in minutes for this reading section.
     - **file**: The PDF document for the exam.
     """
     if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
@@ -495,9 +492,6 @@ async def update_listening_exam_for_set_endpoint(
     and associate it with an existing ExamSet.
 
     - **exam_set_id**: The ID of the parent ExamSet.
-    - **exam_part_code**: A unique code for this specific listening exam (e.g., listening_01).
-    - **title_for_part**: The title for this listening section.
-    - **time_limit_minutes_for_part**: Duration in minutes for this listening section.
     - **file**: The PDF document for the exam.
     """
     if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại

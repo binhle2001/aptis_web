@@ -19,6 +19,8 @@ ENV PATH="/root/.local/bin:${PATH}"
 COPY ./app /app/app 
 COPY .env /app/.env 
 
+
 EXPOSE 5055 
 # Lệnh chạy uvicorn, trỏ đến instance FastAPI trong app/main.py
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5055", "--reload"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5055 --reload"]
+
