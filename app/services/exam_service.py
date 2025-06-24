@@ -405,7 +405,7 @@ def get_reading_exam_by_id(exam_id):
         SELECT group_id, topic, sentence_text, sentence_key, is_example_first
             FROM reading_part_2
             WHERE exam_id = %s
-            ORDER BY group_id, sentence_key
+            ORDER BY group_id
     """, (exam_id,))
     rows = cur.fetchall()
     part2_groups = {}

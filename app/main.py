@@ -46,11 +46,11 @@ def read_secure_data(credentials: HTTPAuthorizationCredentials = Depends(bearer_
 #     # Tạo user member mẫu
 #     await create_sample_user("member", "memberpass", "Normal Member", "member")
 #     print("Startup events finished.")
-origins = ["http://127.0.0.1"]
+origins = ["http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
