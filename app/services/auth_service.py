@@ -59,6 +59,7 @@ async def login_for_access_token(form_data: UserLoginSchema):
                 detail="User inactive",
                 headers={"is_active": "false"},
             )
+        print("nguuuu")
         if not user_in_db:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,6 +86,7 @@ async def login_for_access_token(form_data: UserLoginSchema):
             "fullname": user_in_db["fullname"]
             # Bạn có thể thêm các thông tin khác vào payload của token nếu cần
         }
+       
         access_token = create_access_token(
             data=access_token_data, expires_delta=access_token_expires
         )

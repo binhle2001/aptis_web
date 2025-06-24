@@ -405,7 +405,7 @@ def get_reading_exam_by_id(exam_id):
         SELECT group_id, topic, sentence_text, sentence_key, is_example_first
             FROM reading_part_2
             WHERE exam_id = %s
-            ORDER BY group_id, sentence_key
+            ORDER BY group_id
     """, (exam_id,))
     rows = cur.fetchall()
     part2_groups = {}
@@ -1157,12 +1157,11 @@ def load_audio_as_base64(path_or_url: str) -> str:
     """
     try:
         if path_or_url.lower().startswith("http"):
-            resp = requests.get(path_or_url)
-            resp.raise_for_status()
-            data = resp.content
-        else:
-            with open(path_or_url, "rb") as f:
-                data = f.read()
+            download_url = _ensure_drive_url(path_or_url)
+            path_or_url = "temp.mp3"
+            gdown.download(download_url, output=path_or_url, quiet=False)
+        with open(path_or_url, "rb") as f:
+            data = f.read()
         return base64.b64encode(data).decode("utf-8")
     except Exception as e:
         # Tùy nhu cầu, có thể raise hoặc trả về None

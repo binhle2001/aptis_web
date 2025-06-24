@@ -6,6 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --user -r requirements.txt
+COPY ./db /app/db
 
 # Stage 2: Runtime/Final stage
 FROM --platform=linux/amd64 python:3.9-slim-bullseye
@@ -18,6 +19,8 @@ ENV PATH="/root/.local/bin:${PATH}"
 COPY ./app /app/app 
 COPY .env /app/.env 
 
+
 EXPOSE 5055 
 # Lệnh chạy uvicorn, trỏ đến instance FastAPI trong app/main.py
-CMD ["sh", "-c", "python main.py"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5055 --reload"]
+
