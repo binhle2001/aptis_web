@@ -20,4 +20,4 @@ COPY .env /app/.env
 
 EXPOSE 5055 
 # Lệnh chạy uvicorn, trỏ đến instance FastAPI trong app/main.py
-CMD ["sh", "-c", "python db/migration.py && python main.py"]
+CMD ["sh", "-c", "python main.py"]
