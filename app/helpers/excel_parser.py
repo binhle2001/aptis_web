@@ -1,7 +1,7 @@
 import json
 from openpyxl import load_workbook
 from collections import OrderedDict
-
+import pandas as pd
 
 def aptis_reading_to_json(file_path):
     """
@@ -266,11 +266,84 @@ def aptis_listening_to_json(file_path):
     return result
 
 
+def aptis_speaking_to_json(file_path: str) -> str:
+    """
+    Đọc file Excel chứa đề thi Speaking và chuyển đổi thành chuỗi JSON
+    theo cấu trúc yêu cầu: một object cho mỗi part.
+
+    Args:
+        file_path (str): Đường dẫn tới file Excel (.xlsx).
+
+    Returns:
+        str: Một chuỗi JSON có cấu trúc đại diện cho đề thi.
+             Trả về chuỗi JSON rỗng '[]' nếu có lỗi hoặc file trống.
+    """
+    try:
+        df = pd.read_excel(file_path)
+
+        # Bước 1: Tiền xử lý dữ liệu
+        grouping_cols = ['Topic', 'part', 'instruction']
+        for col in grouping_cols:
+            if col not in df.columns:
+                raise ValueError(f"File Excel thiếu cột bắt buộc: '{col}'")
+        
+        df[grouping_cols] = df[grouping_cols].ffill()
+        df['part'] = df['part'].astype(int)
+        
+        # Thay thế các giá trị NaN (ô trống) bằng None để JSON hiển thị là "null"
+        # Điều này đặc biệt quan trọng cho các cột image_url
+        df = df.where(pd.notna(df), None)
+
+        image_cols = [col for col in df.columns if col.startswith('image_url_')]
+        
+        # Bước 2: Xây dựng cấu trúc JSON theo yêu cầu
+        exam_parts = []
+        for part_id, group in df.groupby('part'):
+            # Lấy thông tin chung từ dòng đầu tiên của nhóm
+            first_row = group.iloc[0]
+
+            # Gom tất cả các câu hỏi trong nhóm thành một danh sách
+            questions_list = group['question'].dropna().tolist()
+
+            part_data = {
+                "part": int(part_id),
+                "topic": first_row['Topic'],
+                "instruction": first_row['instruction'],
+                "question": questions_list
+            }
+            
+            # Thêm các trường image_url vào đối tượng
+            # Logic: Lấy giá trị đầu tiên không rỗng cho mỗi cột image_url trong group
+            # Thường thì chỉ có 1 giá trị trong cả nhóm
+            for img_col in image_cols:
+                # Tìm giá trị không phải None đầu tiên trong cột ảnh của nhóm này
+                first_valid_image_url = group[img_col].dropna().unique()
+                if len(first_valid_image_url) > 0:
+                    part_data[img_col] = first_valid_image_url[0]
+                else:
+                    part_data[img_col] = None
+
+            exam_parts.append(part_data)
+
+        return json.dumps(exam_parts, indent=4, ensure_ascii=False)
+
+    except FileNotFoundError:
+        print(f"Lỗi: Không tìm thấy file tại '{file_path}'")
+        return "[]"
+    except ValueError as ve:
+        print(f"Lỗi dữ liệu: {ve}")
+        return "[]"
+    except Exception as e:
+        print(f"Đã xảy ra lỗi không xác định: {e}")
+        return "[]"
+
+
+
 if __name__ == "__main__":
-    json_data = aptis_reading_to_json("aptis_1_reading_template.xlsx")
+    json_data = aptis_speaking_to_json("C:/Users/admin/Desktop/aptis_web/Aptis_Speaking_Template.xlsx")
     print(json.dumps(json_data, indent=2, ensure_ascii=False))
     
     # Lưu ra file JSON
-    with open("aptis_reading.json", "w", encoding="utf-8") as f:
+    with open("aptis_speaking.json", "w", encoding="utf-8") as f:
         json.dump(json_data, f, indent=2, ensure_ascii=False)
         

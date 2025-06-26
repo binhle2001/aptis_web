@@ -8,14 +8,14 @@ from datetime import timedelta
 
 
 def insert_guest_info(fullname, phone_number):
+    conn = get_db_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("Select id FROM guest Where fullname = %s OR phone_number = %s", (fullname, phone_number))
+        row = cur_validate.fetchone()
+        if row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Full name or phone number have already existed!")
+    cursor = conn.cursor()
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
-            cur_validate.execute("Select id FROM guest Where fullname = %s OR phone_number = %s", (fullname, phone_number))
-            row = cur_validate.fetchone()
-            if row:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Full name or phone number have already existed!")
-        cursor = conn.cursor()
         cursor.execute("INSERT INTO guest (fullname, phone_number) VALUES (%s, %s) RETURNING id, fullname, phone_number, created_at", (fullname, phone_number))
         row = cursor.fetchone()
         conn.commit()
@@ -41,14 +41,14 @@ def insert_guest_info(fullname, phone_number):
     
 
 def call_guest(guest_id):
+    conn = get_db_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("Select * FROM guest Where id = %s", (guest_id,))
+        row = cur_validate.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Guest with {guest_id} not exist!")
+    cursor = conn.cursor()
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
-            cur_validate.execute("Select * FROM guest Where id = %s", (guest_id,))
-            row = cur_validate.fetchone()
-            if not row:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Guest with {guest_id} not exist!")
-        cursor = conn.cursor()
         cursor.execute("UPDATE guest SET is_called = %s Where id = %s", (True, guest_id))
         conn.commit()
         return JSONResponse(status_code=status.HTTP_200_OK, content = {"message": "success"})
@@ -63,9 +63,9 @@ def get_list_guest(
     page: int = 1,
     limit: int = 100
     ):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
         offset = (page-1) * limit
         cursor.execute("SELECT id, fullname, phone_number, created_at, is_called FROM guest ORDER BY created_at DESC LIMIT %s OFFSET %s;", (limit, offset))
         rows = cursor.fetchall()
@@ -92,14 +92,15 @@ def get_list_guest(
 
 
 def delete_guest(guest_id):
+    conn = get_db_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("Select * FROM guest Where id = %s", (guest_id,))
+        row = cur_validate.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Guest with {guest_id} not exist!")
+    cursor = conn.cursor()
     try:
-        conn = get_db_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
-            cur_validate.execute("Select * FROM guest Where id = %s", (guest_id,))
-            row = cur_validate.fetchone()
-            if not row:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Guest with {guest_id} not exist!")
-        cursor = conn.cursor()
+        
         cursor.execute("DELETE FROM guest Where id = %s",  (guest_id,))
         conn.commit()
         return JSONResponse(status_code=status.HTTP_200_OK, content = {"message": "success"})

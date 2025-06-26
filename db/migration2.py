@@ -38,6 +38,7 @@ add_new_tables = [
         part_id INTEGER NOT NULL,
         topic VARCHAR(255),
         instruction TEXT,
+        instruction_audio TEXT,
         question TEXT NOT NULL,
         image_path1 VARCHAR(255),
         image_path2 VARCHAR(255)

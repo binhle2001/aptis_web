@@ -7,7 +7,7 @@ from services.guest_service import call_guest, delete_guest, get_list_guest
 from schemas.user_schema import GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
 from services import user_service, exam_service, exam_set_service 
 from core.deps import get_current_admin_user # Dependency để xác thực Admin
-from schemas.exam_schema import ExamCreateResponseSchema, ExamReadingUpdate
+from schemas.exam_schema import AudioPath, ExamCreateResponseSchema, ExamReadingUpdate
 from schemas.exam_set_schema import ExamSetCreateSchema, ExamSetListResponseSchema, ExamSetResponseSchema
 
 router = APIRouter(
@@ -559,5 +559,12 @@ async def call_guest_endpoint(guest_id: int, current_admin: Annotated[dict, Depe
 async def delete_guest_endpoint(guest_id: int):
     return delete_guest(guest_id)
 
-
+@router.post("/exam-audio")
+async def get_audio_path_speaking(
+    item: AudioPath,
+    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+):
+    file = exam_service.load_audio_as_base64(item.audio_path)
+    response = {"audio": file}
+    return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
