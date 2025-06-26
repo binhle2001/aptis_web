@@ -23,7 +23,6 @@ async def login_for_access_token_endpoint(
     """
     # Khi dùng UserLoginSchema (JSON body):
     token_data = await auth_service.login_for_access_token(form_data)
-
     # Khi dùng OAuth2PasswordRequestForm (form data):
     # user_login_data = UserLoginSchema(username=form_data.username, password=form_data.password)
     # token_data = await auth_service.login_for_access_token(user_login_data)

@@ -46,7 +46,7 @@ def read_secure_data(credentials: HTTPAuthorizationCredentials = Depends(bearer_
 #     # Tạo user member mẫu
 #     await create_sample_user("member", "memberpass", "Normal Member", "member")
 #     print("Startup events finished.")
-origins = ["http://localhost:3000"]
+origins = ["http://localhost:3000", "https://aptisone-test.io.vn"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
