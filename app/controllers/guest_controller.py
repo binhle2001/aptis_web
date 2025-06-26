@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện hơn UserLoginSchema cho form data
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
+from schemas.user_schema import GuestInsertSchema, GuestSchema
+from services.guest_service import insert_guest_info
 from core.deps import get_current_member_user
 from schemas.auth_schema import TokenSchema, UserLoginSchema
 from schemas.exam_schema import AudioPath
@@ -10,9 +12,9 @@ from schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSc
 from services import auth_service, exam_service, exam_set_service
 
 router = APIRouter(
-    prefix="/api/user",
+    prefix="/api/guest",
     tags=["Member - User Management"],
-    dependencies=[Depends(get_current_member_user)], # Áp dụng cho tất cả các route trong router này
+    dependencies=[], # Áp dụng cho tất cả các route trong router này
     responses={
         401: {"description": "Not authenticated"},
         403: {"description": "Operation not permitted"},
@@ -40,7 +42,7 @@ async def list_exam_sets_endpoint(
 @router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)
 async def get_exam_set_endpoint(
     exam_set_id: int,
-    current_admin: Annotated[dict, Depends(get_current_member_user)]
+    current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
     exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id)
     return ExamSetResponseSchema(**exam_set)
@@ -48,7 +50,7 @@ async def get_exam_set_endpoint(
 @router.get("/exam/{exam__id}")
 async def get_exam_set_endpoint(
     exam__id: int,
-    current_admin: Annotated[dict, Depends(get_current_member_user)]
+    current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
     exam_set = exam_service.get_exam_by_id(exam__id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
@@ -56,8 +58,13 @@ async def get_exam_set_endpoint(
 @router.post("/exam-audio")
 async def get_audio_path_listening(
     item: AudioPath,
-    current_admin: Annotated[dict, Depends(get_current_member_user)]
+    current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
-    file = exam_service.load_audio_as_base64(item.audio_path)
+    file = exam_service.load_audio_as_base64(item.audio_path, )
     response = {"audio": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
+
+@router.post("/info")
+async def insert_guest_info_endpoint(item: GuestInsertSchema):
+    return JSONResponse(status_code=status.HTTP_200_OK, content = insert_guest_info(item.fullname, item.phone_number))
+

@@ -236,7 +236,10 @@ def delete_exam_data(exam_id):
             "listening_part_1",
             "listening_part_2",
             "listening_part_3",
-            "listening_part_4",
+            "listening_part_4"
+            "speaking",
+            "writing",
+            "exam_submission",
             'exams'
         ]
 
@@ -1239,3 +1242,4 @@ def download_all_listening():
     conn.commit()
     cur.close()
     conn.close()
+
