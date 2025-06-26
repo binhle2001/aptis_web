@@ -11,3 +11,4 @@ openpyxl
 sqlalchemy 
 gdown
 apscheduler
+pandas
