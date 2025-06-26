@@ -20,7 +20,7 @@ add_new_tables = [
 
     # Bảng guests: Lưu thông tin khách vãng lai làm bài thi thử
     """
-    CREATE TABLE IF NOT EXISTS guests (
+    CREATE TABLE IF NOT EXISTS guest (
         id SERIAL PRIMARY KEY,
         fullname VARCHAR(255) NOT NULL,
         phone_number VARCHAR(20) NOT NULL,
@@ -39,7 +39,8 @@ add_new_tables = [
         topic VARCHAR(255),
         instruction TEXT,
         question TEXT NOT NULL,
-        image_path VARCHAR(255)
+        image_path1 VARCHAR(255),
+        image_path2 VARCHAR(255)
     );
     """,
 
@@ -60,7 +61,7 @@ add_new_tables = [
     # Không có guest_id vì không lưu lịch sử của khách.
     # user_id có thể là NULL để xử lý bài nộp của khách, nhưng sẽ không được liên kết.
     """
-    CREATE TABLE IF NOT EXISTS exam_submissions (
+    CREATE TABLE IF NOT EXISTS exam_submission (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         exam_id INTEGER REFERENCES exams(id) ON DELETE CASCADE NOT NULL,

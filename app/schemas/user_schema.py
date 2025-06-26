@@ -104,3 +104,35 @@ class UserListResponseSchema(BaseModel):
                 "page": 0
             }
         }
+class GuestInsertSchema(BaseModel):
+    fullname: str = Field(..., example="Nguyễn Văn A")
+    phone_number: str = Field(..., example="0323245245")
+    class Config:
+        json_schema_extra = {
+            "fullname": "Nguyễn Văn A",
+            "phone_number": "023817211",
+        }
+class GuestSchema(BaseModel):
+    id: int
+    fullname: str = Field(..., example="Nguyễn Văn A")
+    phone_number: str = Field(..., example="0323245245")
+    is_called: bool
+    class Config:
+        json_schema_extra = {
+            "id": 1,
+            "fullname": "Nguyễn Văn A",
+            "phone_number": "023817211",
+            "is_called": True
+        }
+class GuestResponseSchema(BaseModel):
+    items: List[GuestSchema]
+    total: int # Tổng số lượng bản ghi khớp với query (trước khi phân trang)
+    total_pages: Optional[int] = None
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "items": {},
+                "total": 25,
+                "total_pages": 0
+            }
+        }

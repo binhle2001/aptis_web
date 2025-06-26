@@ -30,22 +30,24 @@ async def get_current_active_user(
     conn = None
     try:
         conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, username, fullname, role, phone_number, is_active, created_at, updated_at " # Thêm is_active
-                "FROM Users WHERE username = %s", (current_user_token_payload.sub,)
-            )
-            user_in_db = cur.fetchone()
-        if not user_in_db:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        # <<< KIỂM TRA is_active Ở ĐÂY >>>
-        if not user_in_db.get('is_active', False): # Mặc định là False nếu không có trường (an toàn)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, # Hoặc 403 Forbidden
-                detail="Inactive user. Account has been deactivated."
-            )
-        return user_in_db
+        if current_user_token_payload.role != "guest":
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, username, fullname, role, phone_number, is_active, created_at, updated_at " # Thêm is_active
+                    "FROM Users WHERE username = %s", (current_user_token_payload.sub,)
+                )
+                user_in_db = cur.fetchone()
+            if not user_in_db:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # <<< KIỂM TRA is_active Ở ĐÂY >>>
+            if not user_in_db.get('is_active', False): # Mặc định là False nếu không có trường (an toàn)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, # Hoặc 403 Forbidden
+                    detail="Inactive user. Account has been deactivated."
+                )
+            return user_in_db
+        return {"role": "guest"}
     finally:
         if conn:
             conn.close()
@@ -66,9 +68,12 @@ async def get_current_admin_user(
 async def get_current_member_user(
     current_user: Annotated[dict, Depends(get_current_active_user)]
 ) -> dict:
-    if current_user.get("role") != "member" and current_user.get("role") != "admin":
+    if current_user.get("role") != "member" and current_user.get("role") != "admin" and current_user.get("role") != "guest":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operation not permitted: Requires admin privileges"
         )
     return current_user
+
+
+

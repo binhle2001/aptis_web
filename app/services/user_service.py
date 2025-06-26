@@ -1,3 +1,4 @@
+import json
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -529,3 +530,43 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
     finally:
         if conn:
             conn.close()
+            
+async def put_exam_submission(user_id, exam_id, submission_data, score = None,):
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, username, role, is_active FROM Users WHERE id = %s", (user_id,))
+            user_to_delete = cur.fetchone()
+
+            if not user_to_delete:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with ID {user_id} not found."
+                )
+        with conn.cursor() as cur_validator:
+            cur.execute("SELECT id FROM exam WHERE id = %s", (exam_id,))
+            row = cur_validator.fetchone()
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Exam with ID {exam_id} not found."
+                )
+        cursor = conn.cursor()
+        answer_string = json.dumps(submission_data)
+        if score is not None:
+            cursor.execute("""INSERT INTO exam_submission (user_id, exam_id, score, answer_string, is_scored) 
+                           VALUES (%s, %s, %s, %s, %s) 
+                           RETURNING id, user_id, exam_id, score, is_scored;""", 
+                           (user_id, exam_id, score, answer_string, True))
+        else:
+            cursor.execute("""INSERT INTO exam_submission (user_id, exam_id, answer_string) 
+                           VALUES (%s, %s, %s, %s, %s) 
+                           RETURNING id, user_id, exam_id, score, is_scored;""", 
+                           (user_id, exam_id, answer_string))
+            
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cursor.close()
+        conn.close()

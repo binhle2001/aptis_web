@@ -1239,3 +1239,8 @@ def download_all_listening():
     conn.commit()
     cur.close()
     conn.close()
+
+SPEAKING_AUDIO_PATH = "raw_file/speaking"
+def put_speaking(question_id, excel_file: Optional[UploadFile]):
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
