@@ -1226,12 +1226,16 @@ def download_all_listening():
                     gdown.download(download_url, output=local_path, quiet=False)
                     print(f"Downloaded: {download_url} -> {local_path}")
                 except Exception as e:
+                    cur.close()
+                    conn.close()
                     print(f"Failed to download {download_url}: {e}")
+                    return
                 cur.execute(f"""
                 UPDATE {table}
                    SET audio_path = %s
                  WHERE id = %s
             """, (local_path, rec_id))
+                conn.commit()
             else:
                 # Non-HTTP, assume local path, check exist
                 if not os.path.exists(path_in):
@@ -1239,7 +1243,6 @@ def download_all_listening():
                 else:
                     print(f"Local file exists: {path_in}")
 
-    conn.commit()
-    cur.close()
-    conn.close()
+    
+    
 
