@@ -28,13 +28,13 @@ async def list_exam_sets_endpoint(
     search: Optional[str] = Query("", description="Filter by exam code, title (e.g., 'R0001')"),
     page: int = Query(1, ge=0, description="Number of page"),
     limit: int = Query(1, ge=1, le=200, description="Maximum number of records to return"), # Giới hạn max limit,
-    _: Annotated[dict, Depends(get_current_member_user)] = None,  # nếu cần xác thực admin
+    current_user: Annotated[dict, Depends(get_current_member_user)] = None,  # nếu cần xác thực admin
 ):
     """
     Lấy danh sách ExamSet có thể filter theo `search`, phân trang với `page` và `limit`.
     Trả về cả `total` và `total_pages`.
     """
-    data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit)
+    data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit, current_role_user = current_user.get("role"))
     return ExamSetListResponseSchema(**data)
 
 @router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)

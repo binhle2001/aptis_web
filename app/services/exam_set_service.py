@@ -107,7 +107,7 @@ async def get_exam_set(
                 r = rows[0]
                 item = dict(r)
                 return {
-                "items": item,
+                "items": [item],
                 "total": 1,
                 "total_pages": 1,
             }

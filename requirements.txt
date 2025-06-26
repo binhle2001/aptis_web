@@ -12,3 +12,8 @@ sqlalchemy
 gdown
 apscheduler
 pandas
+pydub
+unidecode
+phonemizer
+torch
+soundfile

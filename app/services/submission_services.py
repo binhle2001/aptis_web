@@ -77,7 +77,7 @@ async def update_exam_submission(submission_id, submission_data, score = None):
     finally:
         cursor.close()
         conn.close()
-SPEAKING_AUDIO_PATH = "raw_file/speaking"
+SPEAKING_AUDIO_PATH = "raw_file/speaking_submisstion"
 os.makedirs(SPEAKING_AUDIO_PATH, exist_ok=True)
 async def put_speaking(user_id, question_id, audio_file: Optional[UploadFile]):
     if not audio_file.filename or not audio_file.filename.lower().endswith((".mp3", ".wav")):
