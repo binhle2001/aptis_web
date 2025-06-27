@@ -71,7 +71,7 @@ async def get_current_member_user(
     if current_user.get("role") != "member" and current_user.get("role") != "admin" and current_user.get("role") != "guest":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operation not permitted: Requires admin privileges"
+            detail="Operation not permitted: Requires member privileges"
         )
     return current_user
 

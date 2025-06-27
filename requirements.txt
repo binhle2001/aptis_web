@@ -16,4 +16,5 @@ pydub
 unidecode
 phonemizer
 torch
+scipy
 soundfile

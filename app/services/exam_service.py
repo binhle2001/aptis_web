@@ -1243,6 +1243,8 @@ def download_all_listening():
                 else:
                     print(f"Local file exists: {path_in}")
 
-    
-    
+def create_instruction_audio():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, instruction, instruction_audio")
 

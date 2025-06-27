@@ -12,6 +12,9 @@ COPY ./db /app/db
 FROM --platform=linux/amd64 python:3.9-slim-bullseye
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+RUN apt-get update
+RUN apt-cache search espeak
+RUN apt-get install -y espeak
 WORKDIR /app
 COPY --from=builder /root/.local /root/.local
 ENV PATH="/root/.local/bin:${PATH}"

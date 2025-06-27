@@ -3,8 +3,9 @@ from typing import Annotated # Python 3.9+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
+from services.submission_services import get_list_submission, get_submission_by_id, update_exam_submission
 from services.guest_service import call_guest, delete_guest, get_list_guest
-from schemas.user_schema import GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
+from schemas.user_schema import ExamSubmissionSchema, GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
 from services import user_service, exam_service, exam_set_service 
 from core.deps import get_current_admin_user # Dependency để xác thực Admin
 from schemas.exam_schema import AudioPath, ExamCreateResponseSchema, ExamReadingUpdate
@@ -272,13 +273,13 @@ async def list_exam_sets_endpoint(
     data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit)
     return ExamSetListResponseSchema(**data)
 
-@router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)
+@router.get("/exam-sets/{exam_set_id}")
 async def get_exam_set_endpoint(
     exam_set_id: int,
-    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+    current_admin: Annotated[dict, Depends(get_current_admin_user)] = None
 ):
-    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id)
-    return ExamSetResponseSchema(**exam_set)
+    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id, current_admin)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=exam_set)
 
 
 @router.patch(
@@ -552,11 +553,17 @@ async def get_all_guests(
 
 @router.patch("/guest/{guest_id}")
 async def call_guest_endpoint(guest_id: int, current_admin: Annotated[dict, Depends(get_current_admin_user)]):
+    """
+    Thay đổi trạng thái của guest
+    """
     return call_guest(guest_id)
 
 
 @router.delete("/guest/{guest_id}")
 async def delete_guest_endpoint(guest_id: int):
+    """
+    Xóa guest
+    """
     return delete_guest(guest_id)
 
 @router.post("/exam-audio")
@@ -564,7 +571,46 @@ async def get_audio_path_speaking(
     item: AudioPath,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
 ):
+    """
+    Lấy file audio cho bài listening và speaking
+    """
     file = exam_service.load_audio_as_base64(item.audio_path)
     response = {"audio": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
+
+@router.get("/submissions")
+async def get_list_submission_endpoint(
+    fullname: str = Query(None, description="Student name"),
+    is_scored: bool = Query(None, description="is scored"),
+    exam_id: int = Query(None, description="exam_id"),
+    exam_set_id: int = Query(None, description="exam_id"),
+    page: int = Query(1, ge=0, description="Number of page"),
+    limit: int = Query(100, ge=1, le=200, description="Maximum number of records to return")
+):
+    """
+    Lấy danh sách các submission
+    """
+    records = get_list_submission(exam_id=exam_id, is_scored=is_scored, fullname=fullname, examset_id=exam_set_id, page=page, limit = limit)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = records)
+
+@router.get("/submission/{submission_id}")
+async def get_submission_by_id_endpoint(
+    submission_id: int
+):
+    """
+    Chọn submission
+    """
+    records = get_submission_by_id(submission_id)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = records)
+
+@router.patch("/submission/{submission_id}")
+async def score_submission(
+    submission_id: int,
+    item: ExamSubmissionSchema,
+):
+    """
+    Cho điểm submission
+    """
+    response = update_exam_submission(submission_id, item.json_data, item.score)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = response)

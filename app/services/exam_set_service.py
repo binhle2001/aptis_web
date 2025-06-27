@@ -136,38 +136,83 @@ async def get_exam_set(
             conn.close()
 
 
-async def get_exam_set_by_id(exam_set_id: int) -> dict:
+async def get_exam_set_by_id(exam_set_id: int, current_user) -> dict:
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Lấy thông tin exam_set
+            # --- Bước 1: Lấy thông tin cơ bản của exam_set (chung cho mọi vai trò) ---
             cur.execute("""
-                SELECT id, set_code, title, description, created_by_user_id, is_active, created_at, updated_at
+                SELECT id, set_code, title, description
                 FROM exam_sets
-                WHERE id = %s and is_active = %s
-            """, (exam_set_id, True))
-            row = cur.fetchone()
-            if not row:
+                WHERE id = %s AND is_active = TRUE
+            """, (exam_set_id,))
+            
+            exam_set_data = cur.fetchone()
+            if not exam_set_data:
                 raise HTTPException(status_code=404, detail=f"Exam set with id {exam_set_id} not found.")
 
-            row["created_at"] = row["created_at"].isoformat()
-            row["updated_at"] = row["updated_at"].isoformat()
-
-            # Lấy danh sách các bài thi (exams) thuộc exam_set này
-            cur.execute("""
+            # --- Bước 2: Phân luồng xử lý dựa trên vai trò của người dùng ---
+            role = current_user.get("role")
+            
+            if role in ["admin", "guest"]:
+                # === Luồng cho Admin/Teacher: Lấy dữ liệu tổng hợp ===
+                cur.execute("""
                 SELECT id, exam_code, exam_type, description, time_limit
                 FROM exams
                 WHERE examset_id = %s and is_active = %s
-            """, (exam_set_id, True))
-            exams = cur.fetchall()
+                """, (exam_set_id, True))
+                exams = cur.fetchall()
 
-            row["exams"] = exams  # thêm vào kết quả
-            return dict(row)
+                
+                # Chuyển đổi sang kiểu int cho dễ xử lý ở frontend
+                
+            elif role == "member":
+                # === Luồng cho Member: Lấy trạng thái bài nộp của chính họ ===
+                user_id = current_user.get("id")
+                # LEFT JOIN exams với submission của *chính user này*
+                # Điều kiện user_id được đặt trong ON clause để không loại bỏ các exam chưa được nộp.
+                cur.execute("""
+                    SELECT 
+                        e.id, e.exam_code, e.exam_type, e.description, e.time_limit,
+                        s.id AS submission_id,
+                        s.is_scored, s.score, s.id
+                    FROM exams e
+                    LEFT JOIN exam_submission s ON e.id = s.exam_id AND s.user_id = %s
+                    WHERE e.examset_id = %s AND e.is_active = TRUE
+                    ORDER BY e.id;
+                """, (user_id, exam_set_id))
+
+                raw_exams = cur.fetchall()
+                exams = []
+                # Xử lý kết quả thô để tạo ra trường 'submission_status' rõ ràng
+                for exam in raw_exams:
+                    exam_dict = dict(exam)
+                    submission_id = exam_dict.pop("submission_id") # Lấy và xóa khỏi dict
+                    is_scored = exam_dict.pop("is_scored")       # Lấy và xóa khỏi dict
+                    score = exam_dict.pop("score")
+                    
+                    if submission_id is not None:
+                        exam_dict["is_submitted"] = True if is_scored else "pending"
+                        exam_dict["submission"] = {
+                            "id": submission_id, 
+                            "score": score
+                            }
+                    else:
+                        exam_dict["is_submitted"] = False
+                    
+                    exams.append(exam_dict)
+            else:
+                # Xử lý các vai trò không mong muốn
+                raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+            exam_set_data["exams"] = exams
+            return dict(exam_set_data)
+            
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
     finally:
         if conn:
             conn.close()

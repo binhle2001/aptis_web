@@ -4,8 +4,9 @@ import time
 import os
 import json
 import math
+from services.exam_service import _ensure_drive_url
 import torch
-
+import gdown
 from pydub import AudioSegment
 from . import commons
 from . import utils
@@ -14,8 +15,8 @@ from .models import SynthesizerTrn
 from .text.symbols import symbols
 from .text import text_to_sequence
 
+AUDIO_PIP = "/app/raw_file/speaking/instruction_pip.mp3"
 
-OUTPUT_DIR = "raw_file/speaking_instruction/temp"
 def get_text(text, hps):
     text_norm = text_to_sequence(text, hps.data.text_cleaners)
     if hps.data.add_blank:
@@ -23,51 +24,47 @@ def get_text(text, hps):
     text_norm = torch.LongTensor(text_norm)
     return text_norm
 
-def speak_EN(text:str, speed: float = 1.0, vocal:str = "male", output_path = "raw_file/speaking_instruction/audio.mp3"):
-    
-    hps = utils.get_hparams_from_file(f"ai_core/tts/model/EN/{vocal}/config.json")
+def speak_EN(text:str, speed: float = 1.0, vocal:str = "female", output_path = "/app/raw_file/speaking/instruction/audio.mp3"):
+    temp_dir = "/app/ai_tools/data_temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    pretrained_path = "/app/ai_tools/model/pretrained_ljs.pth"
+    weight_url = "https://drive.google.com/file/d/1ut7UkshBXGbe5ElQkaOIeUULb2I1tO48/view?usp=sharing"
+    if not os.path.isfile(pretrained_path):
+        download_url = _ensure_drive_url(weight_url)
+        gdown.download(download_url, output=pretrained_path, quiet=False)
+    hps = utils.get_hparams_from_file(f"/app/ai_tools/model/config.json")
     
     if vocal == "female":
         net_g = SynthesizerTrn(
             len(symbols),
             hps.data.filter_length // 2 + 1,
             hps.train.segment_size // hps.data.hop_length,
-            **hps.model).cuda()
+            **hps.model)
         _ = net_g.eval()
 
-        _ = utils.load_checkpoint("ai_core/tts/model/EN/female/gen_model.pth", net_g, None)   
-        
-    else:
-        net_g = SynthesizerTrn(
-            len(symbols),
-            hps.data.filter_length // 2 + 1,
-            hps.train.segment_size // hps.data.hop_length,
-            n_speakers=hps.data.n_speakers,
-            **hps.model).cuda()
-        _ = net_g.eval()
-        _ = utils.load_checkpoint("ai_core/tts/model/EN/male/gen_model.pth", net_g, None)
+        _ = utils.load_checkpoint(pretrained_path, net_g, None)   
         
     paragraphs = text.split(".")
-    for paragraph in paragraphs[:-1]:
-        output_file = OUTPUT_DIR + '/' + str(time.time()) + ".wav"
+    for i, paragraph in enumerate(paragraphs[:-1]):
+        output_file = f"{temp_dir}/{i:04d}.wav"
         stn_tst = get_text(paragraph, hps)
         with torch.no_grad():
             if vocal == "female": 
-                x_tst = stn_tst.cuda().unsqueeze(0)
-                x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).cuda()
+                x_tst = stn_tst.unsqueeze(0)
+                x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
                 audio = net_g.infer(x_tst, x_tst_lengths, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
             else: 
-                x_tst = stn_tst.cuda().unsqueeze(0)
-                x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).cuda()
-                sid = torch.LongTensor([4]).cuda()
+                x_tst = stn_tst.unsqueeze(0)
+                x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
+                sid = torch.LongTensor([4])
                 audio = net_g.infer(x_tst, x_tst_lengths, sid=sid, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
             sf.write(output_file, audio, int(hps.data.sampling_rate * speed))
-        
-    folder = os.listdir("ai_core/tts/output/chunks")
-    file_names = ["ai_core/tts/output/chunks/" + file_name for file_name in folder]
+    
+    folder = os.listdir(temp_dir)
+    file_names = [f"{temp_dir}/{file_name}" for file_name in folder]
     audio_segments = [AudioSegment.from_file(file_name) for file_name in file_names]
     
     audio = sum(audio_segments)
-    audio.export("ai_core/wav2lip/data/output/output_audio.wav", format="wav")
-    del net_g, hps, audio, audio_segments
-    return "ai_core/wav2lip/data/output/output_audio.wav"
+    audio.export(output_path, format="wav")
+    # del net_g, hps, audio, audio_segments
+    return output_path

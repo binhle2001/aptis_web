@@ -66,7 +66,7 @@ add_new_tables = [
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         exam_id INTEGER REFERENCES exams(id) ON DELETE CASCADE NOT NULL,
-        score FLOAT DEFAULT NULL,
+        score TEXT DEFAULT NULL,
         answer_string TEXT NOT NULL,
         is_scored BOOLEAN DEFAULT FALSE NOT NULL,
         created_at TIMESTAMP DEFAULT NOW(),

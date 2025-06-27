@@ -136,3 +136,22 @@ class GuestResponseSchema(BaseModel):
                 "total_pages": 0
             }
         }
+class ExamSubmissionSchema(BaseModel):
+    json_data: dict = Field(..., example="Nguyễn Văn A")
+    score: str = None
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "json_data": "put json here",
+                "score": "19/50"
+            }
+        }
+
+class SpeakingAudioSchema(BaseModel):
+    audio: str = Field(..., example = "base64")
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "audio": "base64",
+            }
+        }
