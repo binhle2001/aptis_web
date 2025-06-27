@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from services.exam_service import download_all_listening
+from services.exam_service import create_instruction_audio, download_all_listening
 
 bearer_scheme = HTTPBearer()
 
@@ -60,12 +60,14 @@ def setup_scheduler():
     scheduler = AsyncIOScheduler(timezone="Asia/Bangkok")
     trigger = CronTrigger(hour=0, minute=0)
     scheduler.add_job(download_all_listening, trigger, id='daily_download')
+    scheduler.add_job(create_instruction_audio, trigger, id='daily_create_instruction')
     scheduler.start()
     return scheduler
 
 @app.on_event("startup")
 def on_startup():
     download_all_listening()
+    create_instruction_audio()
     app.state.scheduler = setup_scheduler()
     print("Scheduler started: daily download at 00:00 VN time")
 

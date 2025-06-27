@@ -4,7 +4,7 @@ import time
 import os
 import json
 import math
-from services.exam_service import _ensure_drive_url
+import re
 import torch
 import gdown
 from pydub import AudioSegment
@@ -14,9 +14,14 @@ import soundfile as sf
 from .models import SynthesizerTrn
 from .text.symbols import symbols
 from .text import text_to_sequence
+def _ensure_drive_url(url: str) -> str:
+    m = re.search(r'/d/([^/]+)/', url)
+    if m:
+        return f"https://drive.google.com/uc?id={m.group(1)}"
+    return url
 
-AUDIO_PIP = "/app/raw_file/speaking/instruction_pip.mp3"
-
+AUDIO_BEEP = "/app/raw_file/speaking/instruction/beep.mp3"
+os.makedirs("/app/raw_file/speaking/instruction", exist_ok=True)
 def get_text(text, hps):
     text_norm = text_to_sequence(text, hps.data.text_cleaners)
     if hps.data.add_blank:
@@ -46,7 +51,7 @@ def speak_EN(text:str, speed: float = 1.0, vocal:str = "female", output_path = "
         
     paragraphs = text.split(".")
     for i, paragraph in enumerate(paragraphs[:-1]):
-        output_file = f"{temp_dir}/{i:04d}.wav"
+        output_file = f"{temp_dir}/{i:04d}.mp3"
         stn_tst = get_text(paragraph, hps)
         with torch.no_grad():
             if vocal == "female": 
@@ -61,10 +66,10 @@ def speak_EN(text:str, speed: float = 1.0, vocal:str = "female", output_path = "
             sf.write(output_file, audio, int(hps.data.sampling_rate * speed))
     
     folder = os.listdir(temp_dir)
-    file_names = [f"{temp_dir}/{file_name}" for file_name in folder]
+    file_names = [f"{temp_dir}/{file_name}" for file_name in folder] + [AUDIO_BEEP]
     audio_segments = [AudioSegment.from_file(file_name) for file_name in file_names]
     
     audio = sum(audio_segments)
-    audio.export(output_path, format="wav")
+    audio.export(output_path, format="mp3")
     # del net_g, hps, audio, audio_segments
     return output_path

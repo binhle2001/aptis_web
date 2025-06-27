@@ -614,3 +614,9 @@ async def score_submission(
     """
     response = update_exam_submission(submission_id, item.json_data, item.score)
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
+
+@router.post("/sync")
+async def sync_data():
+    exam_service.download_all_listening()
+    exam_service.create_instruction_audio()
+    

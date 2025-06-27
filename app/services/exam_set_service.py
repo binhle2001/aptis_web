@@ -174,9 +174,9 @@ async def get_exam_set_by_id(exam_set_id: int, current_user) -> dict:
                 # Điều kiện user_id được đặt trong ON clause để không loại bỏ các exam chưa được nộp.
                 cur.execute("""
                     SELECT 
-                        e.id, e.exam_code, e.exam_type, e.description, e.time_limit,
+                        e.id as id, e.exam_code, e.exam_type, e.description, e.time_limit,
                         s.id AS submission_id,
-                        s.is_scored, s.score, s.id
+                        s.is_scored, s.score
                     FROM exams e
                     LEFT JOIN exam_submission s ON e.id = s.exam_id AND s.user_id = %s
                     WHERE e.examset_id = %s AND e.is_active = TRUE

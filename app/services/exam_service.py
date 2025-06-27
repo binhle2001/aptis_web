@@ -8,6 +8,7 @@ import psycopg2
 import os
 from psycopg2.extras import execute_values
 import requests
+from ai_tools.EN.inference import speak_EN
 from helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json
 from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
@@ -1192,11 +1193,8 @@ def _download_file(url: str, local_path: str):
         print(f"Download failed [{url}]: {e}")
 
 # --- Main download function
-def _ensure_drive_url(url: str) -> str:
-    m = re.search(r'/d/([^/]+)/', url)
-    if m:
-        return f"https://drive.google.com/uc?id={m.group(1)}"
-    return url
+
+
 
 # --- Main download function
 def download_all_listening():
@@ -1246,5 +1244,27 @@ def download_all_listening():
 def create_instruction_audio():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, instruction, instruction_audio")
+    for i in range(1, 5):
+        cursor.execute("SELECT id, instruction, topic, instruction_audio, question FROM speaking WHERE part_id = %s", (i,))
+        rows = cursor.fetchall()
+        for k, row in enumerate(rows):
+            if row["instruction_audio"] is None:
+                question_id = row["id"]
+                output_path = f"/app/raw_file/speaking/instruction/{question_id}.mp3"
+                instruction = row["instruction"]
+                question = row["question"]
+                topic = row["topic"]
+                if k == 0:
+                    text = f"{instruction}.{topic}.{question}"
+                else:
+                    text = question
+                audio_instruction = speak_EN(text, output_path = output_path)
+                cursor.execute("UPDATE speaking SET instruction_audio = %s WHERE id = %s", (audio_instruction, question_id))
+                conn.commit()
+    cursor.close()
+    conn.close()
+    
+                
+            
+            
 

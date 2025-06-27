@@ -341,7 +341,7 @@ def aptis_speaking_to_json(file_path: str) -> str:
 
 if __name__ == "__main__":
     json_data = aptis_speaking_to_json("C:/Users/admin/Desktop/aptis_web/Aptis_Speaking_Template.xlsx")
-    print(json.dumps(json_data, indent=2, ensure_ascii=False))
+    print(json_data)
     
     # Lưu ra file JSON
     with open("aptis_speaking.json", "w", encoding="utf-8") as f:

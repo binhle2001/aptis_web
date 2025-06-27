@@ -50,7 +50,7 @@ async def login_for_access_token(form_data: UserLoginSchema):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username, password_hash, role, fullname, is_active FROM Users WHERE username = %s", (form_data.username,))
+            cur.execute("SELECT id, username, password_hash, role, fullname, is_active FROM Users WHERE LOWER(username) = LOWER(%s);", (form_data.username,))
             user_in_db = cur.fetchone()
         if not user_in_db:
             raise HTTPException(
@@ -115,7 +115,7 @@ async def create_sample_user(username, password, fullname, role="member"):
         conn = get_db_connection()
         with conn.cursor() as cur:
             # Kiểm tra xem user đã tồn tại chưa
-            cur.execute("SELECT username FROM Users WHERE username = %s", (username,))
+            cur.execute("SELECT username FROM Users WHERE WHERE LOWER(username) = LOWER(%s)", (username,))
             if cur.fetchone():
                 print(f"User '{username}' already exists.")
                 return
