@@ -29,7 +29,6 @@ def put_exam_submission(user_id, exam_id, submission_data, score = None,):
     cursor = conn.cursor()
     cursor.execute("SELECT id, user_id, exam_id FROM exam_submission WHERE user_id = %s and exam_id = %s;", (user_id, exam_id))
     row = cursor.fetchone()
-    # print("row", row)
     if row:
         submission_id = row["id"]
         return update_exam_submission(submission_id, submission_data, score)

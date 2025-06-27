@@ -110,7 +110,7 @@ async def post_audio_file_endpoint(
     saved_audio_file_path_str = f"{SPEAKING_SUBMISSION_DIR}/{question_id}_{user_id}.mp3"
     # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
     save_base64_to_audio_file(audio_file, saved_audio_file_path_str)
-    return 
+    return JSONResponse(status_code=status.HTTP_200_OK, content = {"audio_path": saved_audio_file_path_str})
 
     
 
