@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from services.exam_service import create_instruction_audio, download_all_images, download_all_listening
+from services.exam_service import cleanup_orphaned_files, create_instruction_audio, download_all_images, download_all_listening
 
 bearer_scheme = HTTPBearer()
 
@@ -62,6 +62,7 @@ def setup_scheduler():
     scheduler.add_job(download_all_listening, trigger, id='daily_download')
     scheduler.add_job(create_instruction_audio, trigger, id='daily_create_instruction')
     scheduler.add_job(download_all_images, trigger, id='daily_download_image')
+    scheduler.add_job(cleanup_orphaned_files, trigger, id='cleanup_orphaned_files')
     scheduler.start()
     return scheduler
 
@@ -70,6 +71,7 @@ def on_startup():
     download_all_listening()
     create_instruction_audio()
     download_all_images()
+    cleanup_orphaned_files()
     app.state.scheduler = setup_scheduler()
     print("Scheduler started: daily download at 00:00 VN time")
 

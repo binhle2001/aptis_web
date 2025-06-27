@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import re
 import shutil
 from typing import Optional
@@ -1658,3 +1659,100 @@ def get_speaking_exam_by_id(exam_id):
     finally:
         if conn:
             conn.close()
+            
+def cleanup_orphaned_files():
+    """
+    Hàm duy nhất để thực hiện toàn bộ quá trình dọn dẹp file mồ côi.
+    Hàm này được thiết kế để chạy tự động bởi một cron job.
+    """
+    logging.info("--- Bắt đầu phiên dọn dẹp file mồ côi ---")
+    
+    # Xác định các đường dẫn tuyệt đối
+    raw_file_path = "/app/raw_file"
+    
+    # Định nghĩa các tác vụ dọn dẹp
+    cleanup_tasks = [
+        {
+            "name": "Listening Audio",
+            "directory": os.path.join(raw_file_path, 'audio'),
+            "query": """
+                SELECT audio_path FROM listening_part_1 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_2 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_3 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_4 WHERE audio_path IS NOT NULL;
+            """
+        },
+        {
+            "name": "Speaking Images",
+            "directory": os.path.join(raw_file_path, 'speaking', 'image'),
+            "query": """
+                SELECT image_path1 FROM speaking WHERE image_path1 IS NOT NULL
+                UNION ALL
+                SELECT image_path2 FROM speaking WHERE image_path2 IS NOT NULL;
+            """
+        },
+        {
+            "name": "Speaking Instruction Audio",
+            "directory": os.path.join(raw_file_path, 'speaking', 'instruction'),
+            "query": "SELECT instruction_audio FROM speaking WHERE instruction_audio IS NOT NULL;"
+        }
+    ]
+
+    conn = None
+    try:
+        # Bước 1: Kết nối CSDL
+        conn = get_db_connection()
+        
+        # Bước 2: Lặp qua từng tác vụ dọn dẹp
+        for task in cleanup_tasks:
+            logging.info(f"--- Bắt đầu xử lý tác vụ: {task['name']} ---")
+            
+            # 2a. Lấy danh sách các file đang được sử dụng từ CSDL
+            used_files = set()
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(task['query'])
+                    rows = cur.fetchall()
+                    for row in rows:
+                        item = dict(row)
+                        if row[list(item)[0]]:
+                            used_files.add(os.path.basename(row[list(item)[0]]))
+                except psycopg2.Error as db_err:
+                    logging.error(f"Lỗi truy vấn CSDL cho tác vụ '{task['name']}': {db_err}")
+                    continue # Bỏ qua tác vụ này và tiếp tục với tác vụ tiếp theo
+
+            logging.info(f"Tìm thấy {len(used_files)} file hợp lệ trong CSDL cho tác vụ '{task['name']}'.")
+
+            # 2b. Quét thư mục và xóa file mồ côi
+            dir_path = task['directory']
+            if not os.path.isdir(dir_path):
+                logging.warning(f"Thư mục '{dir_path}' không tồn tại. Bỏ qua tác vụ.")
+                continue
+
+            files_on_disk_count = 0
+            deleted_count = 0
+            for filename in os.listdir(dir_path):
+                full_path = os.path.join(dir_path, filename)
+                if os.path.isfile(full_path):
+                    files_on_disk_count += 1
+                    if filename not in used_files:
+                        try:
+                            os.remove(full_path)
+                            logging.info(f"Đã xóa file mồ côi: {full_path}")
+                            deleted_count += 1
+                        except OSError as os_err:
+                            logging.error(f"Lỗi khi xóa file '{full_path}': {os_err}")
+            
+            logging.info(f"Hoàn thành tác vụ '{task['name']}'. Quét {files_on_disk_count} file, đã xóa {deleted_count} file.")
+
+    except psycopg2.OperationalError as e:
+        logging.critical(f"Lỗi nghiêm trọng: Không thể kết nối tới CSDL. {e}")
+    except Exception as e:
+        logging.error(f"Đã xảy ra lỗi không mong muốn trong quá trình dọn dẹp: {e}", exc_info=True)
+    finally:
+        if conn:
+            conn.close()
+        logging.info("--- Kết thúc phiên dọn dẹp file mồ côi ---\n")
