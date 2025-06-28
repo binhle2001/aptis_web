@@ -566,7 +566,7 @@ async def delete_guest_endpoint(guest_id: int):
     """
     return delete_guest(guest_id)
 
-@router.post("/exam-audio")
+@router.post("/exam-file")
 async def get_audio_path_speaking(
     item: AudioPath,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
@@ -575,7 +575,7 @@ async def get_audio_path_speaking(
     Lấy file audio cho bài listening và speaking
     """
     file = exam_service.load_audio_as_base64(item.audio_path)
-    response = {"audio": file}
+    response = {"base64": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 

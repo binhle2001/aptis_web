@@ -58,7 +58,7 @@ async def get_exam_set_endpoint(
     exam_set = exam_service.get_exam_by_id(exam__id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
-@router.post("/exam-audio")
+@router.post("/exam-file")
 async def get_audio_path_listening(
     item: AudioPath,
     current_user: Annotated[dict, Depends(get_current_member_user)]
@@ -67,7 +67,7 @@ async def get_audio_path_listening(
     lấy file audio của phần listening
     """
     file = exam_service.load_audio_as_base64(item.audio_path, )
-    response = {"audio": file}
+    response = {"base64": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 @router.post("/info")

@@ -1611,7 +1611,7 @@ def get_speaking_exam_by_id(exam_id):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Lấy tất cả câu hỏi của exam, sắp xếp theo part và id để đảm bảo thứ tự
             cur.execute("""
-                SELECT id, part_id, topic, instruction, question, image_path1, image_path2 
+                SELECT id, part_id, topic, instruction, instruction_audio, question, image_path1, image_path2 
                 FROM speaking
                 WHERE exam_id = %s
                 ORDER BY part_id, id;
@@ -1638,6 +1638,7 @@ def get_speaking_exam_by_id(exam_id):
                         "part": part_id,
                         "topic": row['topic'],
                         "instruction": row['instruction'],
+                        "instruction_audio": row["instruction_audio"],
                         "question": [], # Khởi tạo danh sách câu hỏi rỗng
                         "image_url_1": row['image_path1'],
                         "image_url_2": row['image_path2']
