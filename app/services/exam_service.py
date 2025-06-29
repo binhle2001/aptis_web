@@ -1649,7 +1649,7 @@ def get_speaking_exam_by_id(exam_id):
                 
                 # Thêm câu hỏi hiện tại vào danh sách câu hỏi của phần tương ứng
                 parts_data[part_id]["instruction_audio"].append(row['instruction_audio'])
-                parts_data[part_id]["question"].append(row['question'])
+                parts_data[part_id]["question"].append({"id": row["id"], "text": row['question']})
 
             # Chuyển đổi dictionary các giá trị thành một danh sách
             final_result = list(parts_data.values())
