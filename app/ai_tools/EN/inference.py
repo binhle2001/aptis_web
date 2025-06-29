@@ -49,6 +49,7 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
 
         _ = utils.load_checkpoint(pretrained_path, net_g, None)   
     if isinstance(text, str):
+        text = text.replace("\n", ". ")
         paragraphs = text.split(".")
         for paragraph in paragraphs[:-1]:
             output_file = f"{temp_dir}/{i:04d}.mp3"

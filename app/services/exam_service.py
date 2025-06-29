@@ -1272,7 +1272,10 @@ def download_all_images():
             if image_path1.lower().startswith('http'):
                 download_url = _ensure_drive_url(image_path1)
                 local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_1.jpg"
-                gdown.download(download_url, output=local_path, quiet=False)
+                try:
+                    gdown.download(download_url, output=local_path, quiet=False)
+                except Exception as e:
+                    return e
                 cur.execute(f"""
                     UPDATE {table}
                         SET image_path1 = %s
@@ -1638,13 +1641,14 @@ def get_speaking_exam_by_id(exam_id):
                         "part": part_id,
                         "topic": row['topic'],
                         "instruction": row['instruction'],
-                        "instruction_audio": row["instruction_audio"],
+                        "instruction_audio": [],
                         "question": [], # Khởi tạo danh sách câu hỏi rỗng
                         "image_url_1": row['image_path1'],
                         "image_url_2": row['image_path2']
                     }
                 
                 # Thêm câu hỏi hiện tại vào danh sách câu hỏi của phần tương ứng
+                parts_data[part_id]["instruction_audio"].append(row['instruction_audio'])
                 parts_data[part_id]["question"].append(row['question'])
 
             # Chuyển đổi dictionary các giá trị thành một danh sách
