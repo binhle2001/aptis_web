@@ -1,3 +1,4 @@
+import shutil
 import time
 
 
@@ -74,6 +75,7 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
         audio = sum(audio_segments)
         audio.export(output_path, format="mp3")
         del net_g, hps, audio, audio_segments
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return output_path
     if isinstance(text, list):
         instruction = text[0]
@@ -138,5 +140,6 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
         audio = sum(audio_segments)
         audio.export(output_path, format="mp3")
         del net_g, hps, audio, audio_segments
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return output_path
 
