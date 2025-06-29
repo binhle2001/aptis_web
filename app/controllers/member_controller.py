@@ -10,10 +10,10 @@ from schemas.auth_schema import TokenSchema, UserLoginSchema
 from schemas.exam_schema import AudioPath
 from schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
 from services import auth_service, exam_service, exam_set_service
-
+import os 
 
 SPEAKING_SUBMISSION_DIR = "/app/raw_file/speaking/submission"
-
+os.makedirs(SPEAKING_SUBMISSION_DIR, exist_ok=True)
 router = APIRouter(
     prefix="/api/user",
     tags=["Member - User Management"],
