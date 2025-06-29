@@ -73,7 +73,7 @@ async def get_audio_path_listening(
     Lấy nội dung file audio
     """
     file = exam_service.load_audio_as_base64(item.audio_path)
-    response = {"base-64": file}
+    response = {"base64": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 @router.post("/exam/{exam_id}/submission")
