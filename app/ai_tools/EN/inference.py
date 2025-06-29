@@ -78,25 +78,6 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
         shutil.rmtree(temp_dir, ignore_errors=True)
         return output_path
     if isinstance(text, list):
-        instruction = text[0]
-        paragraphs = instruction.split(".")
-        for paragraph in paragraphs[:-1]:
-            output_file = f"{temp_dir}/{i:04d}.mp3"
-            i += 1
-            stn_tst = get_text(paragraph, hps)
-            with torch.no_grad():
-                if vocal == "female": 
-                    x_tst = stn_tst.unsqueeze(0)
-                    x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
-                    audio = net_g.infer(x_tst, x_tst_lengths, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
-                else: 
-                    x_tst = stn_tst.unsqueeze(0)
-                    x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
-                    sid = torch.LongTensor([4])
-                    audio = net_g.infer(x_tst, x_tst_lengths, sid=sid, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
-                sf.write(output_file, audio, int(hps.data.sampling_rate * speed))
-                
-        instruction_i = i
         topic = text[1]
         paragraphs = topic.split(".")
         for paragraph in paragraphs[:-1]:
