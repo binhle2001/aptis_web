@@ -583,9 +583,9 @@ async def get_audio_path_speaking(
 async def get_list_submission_endpoint(
     fullname: str = Query(None, description="Student name"),
     is_scored: bool = Query(None, description="is scored"),
-    exam_code: int = Query(None, description="exam_code"),
+    exam_code: str = Query(None, description="exam_code"),
     exam_type: str = Query(None, description="exam_type"),
-    exam_set_code: int = Query(None, description="exam_set_code"),
+    exam_set_code: str = Query(None, description="exam_set_code"),
     page: int = Query(1, ge=0, description="Number of page"),
     limit: int = Query(100, ge=1, le=200, description="Maximum number of records to return")
 ):
