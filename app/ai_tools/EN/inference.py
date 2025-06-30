@@ -32,6 +32,7 @@ def get_text(text, hps):
 
 def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app/raw_file/speaking/instruction/audio.mp3"):
     temp_dir = "/app/ai_tools/data_temp"
+    shutil.rmtree(temp_dir, ignore_errors=True)
     os.makedirs(temp_dir, exist_ok=True)
     pretrained_path = "/app/ai_tools/model/pretrained_ljs.pth"
     weight_url = "https://drive.google.com/file/d/1ut7UkshBXGbe5ElQkaOIeUULb2I1tO48/view?usp=sharing"
@@ -115,7 +116,7 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
                 
         folder = os.listdir(temp_dir)
         file_names = [f"{temp_dir}/{file_name}" for file_name in folder]
-        file_names = file_names[:instruction_i] + [AUDIO_BEEP] + file_names[instruction_i:] + [AUDIO_BEEP]
+        file_names = file_names + [AUDIO_BEEP]
         audio_segments = [AudioSegment.from_file(file_name) for file_name in file_names]
             
         audio = sum(audio_segments)

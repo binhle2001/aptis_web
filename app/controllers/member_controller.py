@@ -77,7 +77,7 @@ async def get_audio_path_listening(
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 @router.post("/exam/{exam_id}/submission")
-async def put_exam_submisstion_endpoint(exam_id, item: ExamSubmissionSchema, current_user: Annotated[dict, Depends(get_current_member_user)]):
+async def put_exam_submission_endpoint(exam_id, item: ExamSubmissionSchema, current_user: Annotated[dict, Depends(get_current_member_user)]):
     """
     Đẩy bài làm 
     """

@@ -20,21 +20,6 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
-    build: .
-    container_name: aptis_app_service # Đổi tên để tránh trùng với tên image
-    restart: on-failure
-    env_file:
-      - .env # Load environment variables from .env file
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./app:/app # Mount thư mục app để live reload khi dev
-    ports:
-      - 5055:5055 # APP_PORT từ .env hoặc mặc định 5055
-    # CMD trong Dockerfile sẽ được sử dụng
-    # command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5055", "--reload"] # Có thể ghi đè CMD ở đây
 
 volumes:
   postgres_data:

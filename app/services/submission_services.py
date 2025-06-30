@@ -104,73 +104,101 @@ def get_submission_by_id(submission_id):
 
 import psycopg2.extras
 
-def get_list_submission(exam_id=None, is_scored=None, examset_id=None, fullname=None, page=1, limit=10):
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-    filters = []
-    params = []
-
-    # Xây dựng điều kiện lọc
-    if exam_id is not None:
-        filters.append("es.exam_id = %s")
-        params.append(exam_id)
-
-    if is_scored is not None:
-        filters.append("es.is_scored = %s")
-        params.append(is_scored)
-
-    if examset_id is not None:
-        filters.append("e.examset_id = %s")
-        params.append(examset_id)
-
-    if fullname:
-        filters.append("u.fullname ILIKE %s")
-        params.append(f"%{fullname}%")
-
-    where_clause = " AND ".join(filters)
-    if where_clause:
-        where_clause = "WHERE " + where_clause
-
-    # Truy vấn total (không phân trang)
-    count_query = f"""
-        SELECT COUNT(*) AS total
-        FROM exam_submission es
-        JOIN users u ON es.user_id = u.id
-        JOIN exams e ON es.exam_id = e.id
-        {where_clause}
+def get_list_submission(exam_code=None, is_scored=None, exam_type = None, set_code=None, fullname=None, page=1, limit=10):
     """
-    cursor.execute(count_query, params)
-    total = cursor.fetchone()["total"]
-
-    # Truy vấn danh sách items (có phân trang)
-    offset = (page - 1) * limit
-    paginated_query = f"""
-        SELECT
-            es.id,
-            es.user_id,
-            es.exam_id,
-            u.fullname AS user_name,
-            es.score,
-            es.is_scored
-        FROM exam_submission es
-        JOIN users u ON es.user_id = u.id
-        JOIN exams e ON es.exam_id = e.id
-        {where_clause}
-        ORDER BY es.created_at DESC
-        LIMIT %s OFFSET %s
+    Lấy danh sách các bài nộp với khả năng lọc và phân trang.
+    Sử dụng tìm kiếm một phần (LIKE) cho set_code và exam_code.
     """
-    cursor.execute(paginated_query, params + [limit, offset])
-    rows = cursor.fetchall()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    conn.close()
-    cursor.close()
+        filters = []
+        params = []
 
-    return {
-        "total": total,
-        "page": page,
-        "items": [dict(row) for row in rows]
-    }
+        # --- Xây dựng điều kiện lọc ---
+        if is_scored is not None:
+            filters.append("es.is_scored = %s")
+            params.append(is_scored)
+
+        # <<< THAY ĐỔI: Sử dụng tìm kiếm một phần (LIKE) cho set_code
+        if set_code:
+            filters.append("eset.set_code ILIKE %s")
+            params.append(f"%{set_code}%")
+
+        # <<< THAY ĐỔI: Sử dụng tìm kiếm một phần (LIKE) cho exam_code
+        if exam_code:
+            filters.append("e.exam_code ILIKE %s")
+            params.append(f"%{exam_code}%")
+
+        if exam_type:
+            filters.append("e.exam_type = %s")
+            params.append(exam_type)
+
+        if fullname:
+            filters.append("u.fullname ILIKE %s")
+            params.append(f"%{fullname}%")
+
+        where_clause = " AND ".join(filters)
+        if where_clause:
+            where_clause = "WHERE " + where_clause
+
+        # --- Truy vấn total ---
+        count_query = f"""
+            SELECT COUNT(es.id) AS total
+            FROM exam_submission es
+            JOIN users u ON es.user_id = u.id
+            JOIN exams e ON es.exam_id = e.id
+            JOIN exam_sets eset ON e.examset_id = eset.id
+            {where_clause}
+        """
+        cursor.execute(count_query, params)
+        total_result = cursor.fetchone()
+        total = total_result["total"] if total_result else 0
+
+        # --- Truy vấn danh sách items ---
+        offset = (page - 1) * limit
+        paginated_query = f"""
+            SELECT
+                es.id,
+                es.user_id,
+                es.exam_id,
+                e.exam_type,
+                e.exam_code,
+                eset.set_code AS exam_set_code,
+                eset.title AS exam_set_title,
+                u.fullname AS user_name,
+                es.score,
+                es.is_scored,
+                es.created_at AS submission_time
+            FROM exam_submission es
+            JOIN users u ON es.user_id = u.id
+            JOIN exams e ON es.exam_id = e.id
+            JOIN exam_sets eset ON e.examset_id = eset.id
+            {where_clause}
+            ORDER BY es.created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        cursor.execute(paginated_query, params + [limit, offset])
+        items = cursor.fetchall()
+
+        return {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "items": [dict(row) for row in items]
+        }
+    
+    except (Exception, psycopg2.Error) as error:
+        print(f"Database error: {error}")
+        return {"total": 0, "page": page, "limit": limit, "items": []}
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def save_base64_to_audio_file(base64_str: str, output_path: str) -> None:

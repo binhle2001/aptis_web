@@ -5,3 +5,4 @@ app/raw_file
 app/temp.mp3
 app/ai_tools/model/pretrained_ljs.pth
 app/ai_tools/data_temp
+venv
