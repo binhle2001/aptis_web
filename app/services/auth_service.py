@@ -52,14 +52,6 @@ async def login_for_access_token(form_data: UserLoginSchema):
         with conn.cursor() as cur:
             cur.execute("SELECT id, username, password_hash, role, fullname, is_active FROM Users WHERE username = %s", (form_data.username,))
             user_in_db = cur.fetchone()
-        
-        if not user_in_db["is_active"]:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User inactive",
-                headers={"is_active": "false"},
-            )
-        print("nguuuu")
         if not user_in_db:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -67,6 +59,14 @@ async def login_for_access_token(form_data: UserLoginSchema):
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        if not user_in_db["is_active"]:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User inactive",
+                headers={"is_active": "false"},
+            )
+
+        
         # In a real app, ensure user_in_db['is_active'] is checked if you have such a field
         # if not user_in_db.get('is_active', True): # Giả sử is_active mặc định là True nếu không có
         #     raise HTTPException(status_code=400, detail="Inactive user")
