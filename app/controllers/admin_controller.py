@@ -592,7 +592,7 @@ async def get_list_submission_endpoint(
     """
     Lấy danh sách các submission
     """
-    records = get_list_submission(exam_id=exam_code, is_scored=is_scored, fullname=fullname, examset_id=exam_set_code, page=page, limit = limit)
+    records = get_list_submission(exam_code=exam_code, is_scored=is_scored, exam_type = exam_type, set_code=exam_set_code, fullname=fullname, page=page, limit=limit)
     return JSONResponse(status_code=status.HTTP_200_OK, content = records)
 
 @router.get("/submission/{submission_id}")

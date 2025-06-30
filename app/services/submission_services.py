@@ -171,7 +171,6 @@ def get_list_submission(exam_code=None, is_scored=None, exam_type = None, set_co
                 u.fullname AS user_name,
                 es.score,
                 es.is_scored,
-                es.created_at AS submission_time
             FROM exam_submission es
             JOIN users u ON es.user_id = u.id
             JOIN exams e ON es.exam_id = e.id
