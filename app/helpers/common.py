@@ -1,9 +1,13 @@
 import base64
+import logging
 import os
 from configparser import ConfigParser
 from fastapi import Request
 from typing import Generator
 import pdfplumber
+import psycopg2
+
+
 
 def get_env_var(group, var_name): 
     config = ConfigParser()

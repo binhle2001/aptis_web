@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from services.exam_service import download_all_listening
+from services.exam_service import cleanup_orphaned_files, create_instruction_audio, download_all_images, download_all_listening
 
 bearer_scheme = HTTPBearer()
 
@@ -47,7 +47,7 @@ def read_secure_data(credentials: HTTPAuthorizationCredentials = Depends(bearer_
 #     # Tạo user member mẫu
 #     await create_sample_user("member", "memberpass", "Normal Member", "member")
 #     print("Startup events finished.")
-origins = ["http://localhost:3000", "https://aptisone-test.io.vn"]
+origins = ["http://localhost:3000", "https://aptisone-test.io.vn", "https://ff29-14-247-253-204.ngrok-free.app"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -60,12 +60,18 @@ def setup_scheduler():
     scheduler = AsyncIOScheduler(timezone="Asia/Bangkok")
     trigger = CronTrigger(hour=0, minute=0)
     scheduler.add_job(download_all_listening, trigger, id='daily_download')
+    scheduler.add_job(create_instruction_audio, trigger, id='daily_create_instruction')
+    scheduler.add_job(download_all_images, trigger, id='daily_download_image')
+    scheduler.add_job(cleanup_orphaned_files, trigger, id='cleanup_orphaned_files')
     scheduler.start()
     return scheduler
 
 @app.on_event("startup")
 def on_startup():
     download_all_listening()
+    create_instruction_audio()
+    download_all_images()
+    cleanup_orphaned_files()
     app.state.scheduler = setup_scheduler()
     print("Scheduler started: daily download at 00:00 VN time")
 
@@ -75,4 +81,5 @@ def on_shutdown():
     print("Scheduler shut down")
 if __name__ == "__main__":
     import uvicorn
+    
     uvicorn.run(app, host="0.0.0.0", port=5055)

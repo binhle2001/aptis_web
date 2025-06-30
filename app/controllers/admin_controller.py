@@ -3,8 +3,9 @@ from typing import Annotated # Python 3.9+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Form, Depends
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
+from services.submission_services import get_list_submission, get_submission_by_id, update_exam_submission
 from services.guest_service import call_guest, delete_guest, get_list_guest
-from schemas.user_schema import GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
+from schemas.user_schema import ExamSubmissionSchema, GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
 from services import user_service, exam_service, exam_set_service 
 from core.deps import get_current_admin_user # Dependency để xác thực Admin
 from schemas.exam_schema import AudioPath, ExamCreateResponseSchema, ExamReadingUpdate
@@ -272,13 +273,13 @@ async def list_exam_sets_endpoint(
     data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit)
     return ExamSetListResponseSchema(**data)
 
-@router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)
+@router.get("/exam-sets/{exam_set_id}")
 async def get_exam_set_endpoint(
     exam_set_id: int,
-    current_admin: Annotated[dict, Depends(get_current_admin_user)]
+    current_admin: Annotated[dict, Depends(get_current_admin_user)] = None
 ):
-    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id)
-    return ExamSetResponseSchema(**exam_set)
+    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id, current_admin)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=exam_set)
 
 
 @router.patch(
@@ -552,19 +553,348 @@ async def get_all_guests(
 
 @router.patch("/guest/{guest_id}")
 async def call_guest_endpoint(guest_id: int, current_admin: Annotated[dict, Depends(get_current_admin_user)]):
+    """
+    Thay đổi trạng thái của guest
+    """
     return call_guest(guest_id)
 
 
 @router.delete("/guest/{guest_id}")
 async def delete_guest_endpoint(guest_id: int):
+    """
+    Xóa guest
+    """
     return delete_guest(guest_id)
 
-@router.post("/exam-audio")
+@router.post("/exam-file")
 async def get_audio_path_speaking(
     item: AudioPath,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
 ):
+    """
+    Lấy file audio cho bài listening và speaking
+    """
     file = exam_service.load_audio_as_base64(item.audio_path)
-    response = {"audio": file}
+    response = {"base64": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
+
+@router.get("/submissions")
+async def get_list_submission_endpoint(
+    fullname: str = Query(None, description="Student name"),
+    is_scored: bool = Query(None, description="is scored"),
+    exam_code: str = Query(None, description="exam_code"),
+    exam_type: str = Query(None, description="exam_type"),
+    exam_set_code: str = Query(None, description="exam_set_code"),
+    page: int = Query(1, ge=0, description="Number of page"),
+    limit: int = Query(100, ge=1, le=200, description="Maximum number of records to return")
+):
+    """
+    Lấy danh sách các submission
+    """
+    records = get_list_submission(exam_code=exam_code, is_scored=is_scored, exam_type = exam_type, set_code=exam_set_code, fullname=fullname, page=page, limit=limit)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = records)
+
+@router.get("/submission/{submission_id}")
+async def get_submission_by_id_endpoint(
+    submission_id: int
+):
+    """
+    Chọn submission
+    """
+    records = get_submission_by_id(submission_id)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = records)
+
+@router.patch("/submission/{submission_id}")
+async def score_submission(
+    submission_id: int,
+    item: ExamSubmissionSchema,
+):
+    """
+    Cho điểm submission
+    """
+    response = update_exam_submission(submission_id, item.json_data, item.score)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = response)
+
+@router.post(
+    "/exam-sets/{exam_set_id}/speaking-exam", 
+    response_model=ExamCreateResponseSchema, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a speaking Exam Part for an Exam Set" # Thêm summary cho Swagger
+)
+async def create_speaking_exam_for_set_endpoint(
+    exam_set_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)],
+    exam_part_code: str = Form(
+        ..., 
+        description="Unique code for this speaking part within the exam set (e.g., RD001_S1).",
+        example="RD_SET1_PART"
+    ),
+    title_for_part: str = Form(
+        ..., 
+        description="Title for this speaking part (e.g., 'speaking Section - Aptis General Set 1').",
+        example="speaking - Aptis Test Alpha"
+    ),
+    time_limit_minutes_for_part: int = Form(
+        ..., 
+        gt=0, 
+        description="Time limit in minutes specifically for this speaking part.",
+        example=60
+    ),
+    file: UploadFile = File(
+        ..., 
+        description="The Excel (.xlsx) containing the speaking exam content."
+    )
+):
+    """
+    Allows an Admin to upload a PDF file to create a new speaking exam part
+    and associate it with an existing ExamSet.
+
+    - **exam_set_id**: The ID of the parent ExamSet.
+    - **exam_part_code**: A unique code for this specific speaking exam (e.g., speaking_01).
+    - **title_for_part**: The title for this speaking section.
+    - **time_limit_minutes_for_part**: Duration in minutes for this speaking section.
+    - **file**: The PDF document for the exam.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
+        )
+
+    created_by_user_id = current_admin['id']
+    
+    try:
+        exam_details_dict = await exam_service.create_speaking_exam_from_excel(
+            exam_set_id=exam_set_id,
+            exam_part_code=exam_part_code,
+            descriptions=title_for_part,
+            time_limit_for_part=time_limit_minutes_for_part,
+            excel_file=file,
+            created_by_user_id=created_by_user_id
+        )
+        # exam_details_dict bây giờ nên chứa các trường khớp với ExamCreateResponseSchema
+        # ví dụ: exam_id (của phần thi), exam_code (của phần thi), title (của phần thi), 
+        # exam_type, time_limit_minutes (của phần thi)
+        
+        # Tạo response object từ Pydantic model
+        # Đảm bảo các key trong exam_details_dict khớp với các field của ExamCreateResponseSchema
+        # Hoặc ExamCreateResponseSchema có thể cần được điều chỉnh.
+        # Giả sử exam_details_dict trả về:
+        # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'listening', 'time_limit_minutes': ...}
+        
+        return ExamCreateResponseSchema(
+            exam_id=exam_details_dict['id'],
+            exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
+            title=exam_details_dict['description'],         # Đây là title_for_part
+            exam_type=exam_details_dict['exam_type'],
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
+            message=f"speaking exam part '{exam_part_code}' created successfully for ExamSet ID {exam_set_id}."
+        )
+    except HTTPException as e:
+        # Lỗi đã được xử lý và ném lại từ service, hoặc lỗi validation ở đây
+        raise e
+    except Exception as e_main:
+        # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
+        print(f"Unexpected error in controller: {e_main}")
+        raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")
+
+@router.patch("/exam/speaking/{exam_id}")
+async def update_speaking_exam_for_set_endpoint(
+    exam_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)],
+    file: UploadFile = File(
+        ..., 
+        description="The Excel file excel containing the speaking exam content."
+    )
+):
+    """
+    Allows an Admin to upload a Excel file to create a new speaking exam part
+    and associate it with an existing ExamSet.
+
+    - **exam_set_id**: The ID of the parent ExamSet.
+    - **file**: The Excel document for the exam.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
+        )
+
+    created_by_user_id = current_admin['id']
+    
+    try:
+        exam_details_dict = await exam_service.update_speaking_exam_from_excel(
+            exam_id=exam_id,
+            excel_file=file,
+        )
+        # exam_details_dict bây giờ nên chứa các trường khớp với ExamCreateResponseSchema
+        # ví dụ: exam_id (của phần thi), exam_code (của phần thi), title (của phần thi), 
+        # exam_type, time_limit_minutes (của phần thi)
+        
+        # Tạo response object từ Pydantic model
+        # Đảm bảo các key trong exam_details_dict khớp với các field của ExamCreateResponseSchema
+        # Hoặc ExamCreateResponseSchema có thể cần được điều chỉnh.
+        # Giả sử exam_details_dict trả về:
+        # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'speaking', 'time_limit_minutes': ...}
+        
+        return ExamCreateResponseSchema(
+            exam_id=exam_details_dict['id'],
+            exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
+            title=exam_details_dict['description'],         # Đây là title_for_part
+            exam_type=exam_details_dict['exam_type'],
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
+            message=f"speaking exam part '{exam_details_dict['exam_code']}' update successfully for ExamSet ID {exam_details_dict['examset_id']}."
+        )
+    except HTTPException as e:
+        # Lỗi đã được xử lý và ném lại từ service, hoặc lỗi validation ở đây
+        raise e
+    except Exception as e_main:
+        # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
+        print(f"Unexpected error in controller: {e_main}")
+        raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")
+
+@router.post("/sync")
+async def sync_data():
+    exam_service.download_all_listening()
+    exam_service.create_instruction_audio()
+    exam_service.download_all_images()
+    
+
+@router.post(
+    "/exam-sets/{exam_set_id}/writing-exam", 
+    response_model=ExamCreateResponseSchema, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a writing Exam Part for an Exam Set" # Thêm summary cho Swagger
+)
+async def create_writing_exam_for_set_endpoint(
+    exam_set_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)],
+    exam_part_code: str = Form(
+        ..., 
+        description="Unique code for this writing part within the exam set (e.g., RD001_S1).",
+        example="RD_SET1_PART"
+    ),
+    title_for_part: str = Form(
+        ..., 
+        description="Title for this writing part (e.g., 'writing Section - Aptis General Set 1').",
+        example="writing - Aptis Test Alpha"
+    ),
+    time_limit_minutes_for_part: int = Form(
+        ..., 
+        gt=0, 
+        description="Time limit in minutes specifically for this writing part.",
+        example=60
+    ),
+    file: UploadFile = File(
+        ..., 
+        description="The Excel (.xlsx) containing the writing exam content."
+    )
+):
+    """
+    Allows an Admin to upload a PDF file to create a new writing exam part
+    and associate it with an existing ExamSet.
+
+    - **exam_set_id**: The ID of the parent ExamSet.
+    - **exam_part_code**: A unique code for this specific writing exam (e.g., writing_01).
+    - **title_for_part**: The title for this writing section.
+    - **time_limit_minutes_for_part**: Duration in minutes for this writing section.
+    - **file**: The PDF document for the exam.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
+        )
+
+    created_by_user_id = current_admin['id']
+    
+    try:
+        exam_details_dict = await exam_service.create_writing_exam_from_excel(
+            exam_set_id=exam_set_id,
+            exam_part_code=exam_part_code,
+            descriptions=title_for_part,
+            time_limit_for_part=time_limit_minutes_for_part,
+            excel_file=file,
+            created_by_user_id=created_by_user_id
+        )
+        # exam_details_dict bây giờ nên chứa các trường khớp với ExamCreateResponseSchema
+        # ví dụ: exam_id (của phần thi), exam_code (của phần thi), title (của phần thi), 
+        # exam_type, time_limit_minutes (của phần thi)
+        
+        # Tạo response object từ Pydantic model
+        # Đảm bảo các key trong exam_details_dict khớp với các field của ExamCreateResponseSchema
+        # Hoặc ExamCreateResponseSchema có thể cần được điều chỉnh.
+        # Giả sử exam_details_dict trả về:
+        # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'listening', 'time_limit_minutes': ...}
+        
+        return ExamCreateResponseSchema(
+            exam_id=exam_details_dict['id'],
+            exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
+            title=exam_details_dict['description'],         # Đây là title_for_part
+            exam_type=exam_details_dict['exam_type'],
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
+            message=f"writing exam part '{exam_part_code}' created successfully for ExamSet ID {exam_set_id}."
+        )
+    except HTTPException as e:
+        # Lỗi đã được xử lý và ném lại từ service, hoặc lỗi validation ở đây
+        raise e
+    except Exception as e_main:
+        # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
+        print(f"Unexpected error in controller: {e_main}")
+        raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")
+    
+@router.patch("/exam/writing/{exam_id}")
+async def update_writing_exam_for_set_endpoint(
+    exam_id: int, 
+    current_admin: Annotated[dict, Depends(get_current_admin_user)],
+    file: UploadFile = File(
+        ..., 
+        description="The Excel file excel containing the writing exam content."
+    )
+):
+    """
+    Allows an Admin to upload a Excel file to create a new writing exam part
+    and associate it with an existing ExamSet.
+
+    - **exam_set_id**: The ID of the parent ExamSet.
+    - **file**: The Excel document for the exam.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"): # Kiểm tra filename có tồn tại
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid file type or no filename. Only Excel files (.xlsx) are allowed."
+        )
+
+    created_by_user_id = current_admin['id']
+    
+    try:
+        exam_details_dict = await exam_service.update_writing_exam_from_excel(
+            exam_id=exam_id,
+            excel_file=file,
+        )
+        # exam_details_dict bây giờ nên chứa các trường khớp với ExamCreateResponseSchema
+        # ví dụ: exam_id (của phần thi), exam_code (của phần thi), title (của phần thi), 
+        # exam_type, time_limit_minutes (của phần thi)
+        
+        # Tạo response object từ Pydantic model
+        # Đảm bảo các key trong exam_details_dict khớp với các field của ExamCreateResponseSchema
+        # Hoặc ExamCreateResponseSchema có thể cần được điều chỉnh.
+        # Giả sử exam_details_dict trả về:
+        # { 'exam_id': ..., 'exam_code': ..., 'title': ..., 'exam_type': 'writing', 'time_limit_minutes': ...}
+        
+        return ExamCreateResponseSchema(
+            exam_id=exam_details_dict['id'],
+            exam_code=exam_details_dict['exam_code'], # Đây là exam_part_code
+            title=exam_details_dict['description'],         # Đây là title_for_part
+            exam_type=exam_details_dict['exam_type'],
+            time_limit_minutes=exam_details_dict.get('time_limit'), # Lấy từ record đã tạo
+            message=f"writing exam part '{exam_details_dict['exam_code']}' update successfully for ExamSet ID {exam_details_dict['examset_id']}."
+        )
+    except HTTPException as e:
+        # Lỗi đã được xử lý và ném lại từ service, hoặc lỗi validation ở đây
+        raise e
+    except Exception as e_main:
+        # Lỗi không mong muốn ở controller level (hiếm khi xảy ra nếu service xử lý tốt)
+        print(f"Unexpected error in controller: {e_main}")
+        raise HTTPException(status_code=500, detail=f"An error occurred in the controller: {str(e_main)}")

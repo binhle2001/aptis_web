@@ -1,4 +1,6 @@
 import base64
+import json
+import logging
 import re
 import shutil
 from typing import Optional
@@ -8,14 +10,21 @@ import psycopg2
 import os
 from psycopg2.extras import execute_values
 import requests
-from helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json
+from ai_tools.EN.inference import speak_EN
+from helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
+SPEAKING_FILES_DIR = "/app/raw_file/speaking/excel"
+SPEAKING_IMAGES_DIR = "/app/raw_file/speaking/image"
 LISTENING_FILES_DIR = "/app/raw_file/listening"
 AUDIO_FILES_DIR = "/app/raw_file/audio"
+WRITING_FILE_DIR = "/app/raw_file/writing"
 os.makedirs(READING_FILES_DIR, exist_ok=True)
 os.makedirs(LISTENING_FILES_DIR, exist_ok=True)
 os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
+os.makedirs(SPEAKING_IMAGES_DIR, exist_ok=True)
+os.makedirs(SPEAKING_FILES_DIR, exist_ok=True)
+os.makedirs(WRITING_FILE_DIR, exist_ok=True)
 def insert_reading_part1_json(json_data, exam_id):
     """
     Chèn dữ liệu Part 1 Reading từ JSON vào bảng reading_part_1.
@@ -236,7 +245,7 @@ def delete_exam_data(exam_id):
             "listening_part_1",
             "listening_part_2",
             "listening_part_3",
-            "listening_part_4"
+            "listening_part_4",
             "speaking",
             "writing",
             "exam_submission",
@@ -496,8 +505,12 @@ def get_exam_by_id(exam_id):
         exam_type = row["exam_type"]
         if exam_type == "reading":
             return get_reading_exam_by_id(exam_id)
-        else:
+        elif exam_type == "listening": 
             return get_listening_exam_by_id(exam_id)
+        elif exam_type == "speaking": 
+            return get_speaking_exam_by_id(exam_id)
+        elif exam_type == "writing":
+            return get_writing_exam_by_id(exam_id)
     except HTTPException:
         if conn:
             conn.rollback()
@@ -565,6 +578,26 @@ def update_exam_by_id(exam_id, json_content):
             insert_listening_part3_json(part3, exam_id)
             insert_listening_part4_json(part4, exam_id)  
             return get_listening_exam_by_id(exam_id)
+        if row["exam_type"] == "speaking":
+            tables = [
+                'speaking',
+            ]
+
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
+            conn.commit()
+            insert_speaking_exam(json_content, exam_id)
+            return "success"
+        if row["exam_type"] == "writing":
+            tables = [
+                'writing',
+            ]
+
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
+            conn.commit()
+            insert_writing_exam(json_content, exam_id)
+            return "success"
     except HTTPException:
         if conn:
             conn.rollback()
@@ -1192,11 +1225,8 @@ def _download_file(url: str, local_path: str):
         print(f"Download failed [{url}]: {e}")
 
 # --- Main download function
-def _ensure_drive_url(url: str) -> str:
-    m = re.search(r'/d/([^/]+)/', url)
-    if m:
-        return f"https://drive.google.com/uc?id={m.group(1)}"
-    return url
+
+
 
 # --- Main download function
 def download_all_listening():
@@ -1243,6 +1273,836 @@ def download_all_listening():
                 else:
                     print(f"Local file exists: {path_in}")
 
-    
-    
+def download_all_images():
+    conn = get_db_connection()
+    cur  = conn.cursor()
+    table = "speaking"
+    cur.execute(f"SELECT id, exam_id, image_path1, image_path2 FROM {table}")
+    rows = cur.fetchall()
+    for row in rows:
+        rec_id, exam_id, image_path1, image_path2 = row['id'], row['exam_id'],  row['image_path1'], row['image_path2']
+        # Build download URL
+        if image_path1 is not None:
+            if image_path1.lower().startswith('http'):
+                download_url = _ensure_drive_url(image_path1)
+                local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_1.jpg"
+                try:
+                    gdown.download(download_url, output=local_path, quiet=False)
+                except Exception as e:
+                    return e
+                cur.execute(f"""
+                    UPDATE {table}
+                        SET image_path1 = %s
+                        WHERE id = %s
+                """, (local_path, rec_id))
+                conn.commit()
+        if image_path2 is not None:
+            if image_path2.lower().startswith('http'):
+                download_url = _ensure_drive_url(image_path2)
+                local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_2.jpg"
+                gdown.download(download_url, output=local_path, quiet=False)
+                cur.execute(f"""
+                    UPDATE {table}
+                        SET image_path2 = %s
+                        WHERE id = %s
+                """, (local_path, rec_id))
+                conn.commit()
+    cur.close()
+    conn.close()
 
+def create_instruction_audio():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print("nguuuuu")
+    for i in range(1, 5):
+        cursor.execute("SELECT id, instruction, topic, instruction_audio, question FROM speaking WHERE part_id = %s", (i,))
+        rows = cursor.fetchall()
+        for k, row in enumerate(rows):
+            if row["instruction_audio"] is None:
+                question_id = row["id"]
+                output_path = f"/app/raw_file/speaking/instruction/{question_id}.mp3"
+                instruction = row["instruction"]
+                question = row["question"]
+                topic = row["topic"]
+                text = question
+                print("text ->", text)
+                audio_instruction = speak_EN(text, output_path = output_path)
+                cursor.execute("UPDATE speaking SET instruction_audio = %s WHERE id = %s", (audio_instruction, question_id))
+                conn.commit()
+    cursor.close()
+    conn.close()
+
+
+# Giả sử bạn có hàm get_db_connection()
+# from .database import get_db_connection
+
+def insert_speaking_exam(json_data: str, exam_id: int):
+    """
+    Phân tích chuỗi JSON và ghi các câu hỏi vào bảng 'speaking'.
+    Hàm này được thiết kế để hoạt động với CSDL có 2 cột ảnh riêng biệt:
+    image_path_1 và image_path_2.
+
+    Args:
+        json_data (str): Chuỗi JSON chứa dữ liệu các phần thi Speaking.
+        exam_id (int): ID của bài thi (exam) mà các câu hỏi này thuộc về.
+
+    Returns:
+        int: Số lượng câu hỏi đã được thêm thành công.
+    """
+    conn = None
+    questions_added_count = 0
+
+    try:
+        # Parse chuỗi JSON
+        exam_parts = json.loads(json_data)
+        if not isinstance(exam_parts, list):
+            raise ValueError("JSON đầu vào phải là một danh sách (list).")
+
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            for part_data in exam_parts:
+                part_id = part_data.get("part")
+                topic = part_data.get("topic")
+                instruction = part_data.get("instruction")
+                questions = part_data.get("question", [])
+
+                # Lấy URL ảnh từ JSON
+                image_url_1 = part_data.get("image_url_1")
+                image_url_2 = part_data.get("image_url_2")
+                
+                # Lặp qua các câu hỏi
+                for index, question_text in enumerate(questions):
+                    
+                    # Chỉ gán ảnh cho câu hỏi đầu tiên (index == 0) của Part 2, 3, 4
+                    final_image_1 = None
+                    final_image_2 = None
+                    if index == 0 and part_id in [2, 3, 4]:
+                        final_image_1 = image_url_1
+                        final_image_2 = image_url_2
+                    
+                    # Các câu hỏi tiếp theo sẽ có cả hai trường ảnh là None
+                    
+                    sql_command = """
+                        INSERT INTO speaking 
+                        (exam_id, part_id, topic, instruction, question, image_path1, image_path2) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s);
+                    """
+                    cur.execute(sql_command, (
+                        exam_id, part_id, topic, instruction, 
+                        question_text, final_image_1, final_image_2
+                    ))
+                    questions_added_count += 1
+            
+            conn.commit()
+            print(f"Thành công! Đã thêm {questions_added_count} câu hỏi vào CSDL cho exam_id={exam_id}.")
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Lỗi! Giao dịch sẽ được rollback. Chi tiết: {error}")
+        if conn:
+            conn.rollback()
+        raise error
+    finally:
+        if conn:
+            conn.close()
+    
+    return questions_added_count
+   
+async def create_speaking_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_set_id: int,
+    exam_part_code: str,
+    descriptions: str, # Tiêu đề chung cho phần Reading này
+    time_limit_for_part: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+    created_by_user_id: int,
+    original_file_path: Optional[str] = None # Đường dẫn đến file gốc đã lưu (nếu có)
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    with conn.cursor() as cur_validate:
+        cur_validate.execute("SELECT id FROM exam_sets WHERE id = %s", (exam_set_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
+        cur_validate.execute(
+            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'speaking')
+        ) 
+        if cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Speaking exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
+
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO Exams (examset_id, exam_code, exam_type, description,  time_limit, created_by_user_id, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_set_id, exam_part_code, "speaking", descriptions, 
+                time_limit_for_part, created_by_user_id, True) 
+        )
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create exam record in database.")
+        
+        exam_id = exam_record['id']
+        print(f"Created Exam (SPEAKING Part) record with ID: {exam_id} for ExamSet ID: {exam_set_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{SPEAKING_FILES_DIR}/{excel_file.filename}"
+    print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        speaking_json_data = aptis_speaking_to_json(saved_excel_file_path_str)
+        
+        insert_speaking_exam(speaking_json_data, exam_id)
+        print(f"Successfully committed all parts from Excel for exam_id {exam_id}")
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+                
+
+            
+
+async def update_speaking_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_id: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("SELECT id FROM exams WHERE id = %s", (exam_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
+    
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(
+            """
+            UPDATE Exams SET updated_at = now()
+            WHERE id = %s
+            RETURNING id, examset_id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_id,) 
+        )
+   
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update exam record in database.")
+        
+        exam_id = exam_record['id']
+        examset_id = exam_record['examset_id']
+        print(f"UPDATE Exam (speaking Part) record with ID: {exam_id} for Exam ID: {examset_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{SPEAKING_FILES_DIR}/{excel_file.filename}"
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+        print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        speaking_json_data = aptis_speaking_to_json(saved_excel_file_path_str)
+        
+        update_exam_by_id(exam_id, speaking_json_data)
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        # delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+
+def get_speaking_exam_by_id(exam_id):
+    """
+    Lấy dữ liệu đề thi speaking từ CSDL và tái tạo lại cấu trúc JSON gốc.
+
+    Args:
+        exam_id (int): ID của bài thi (exam) cần lấy.
+
+    Returns:
+        str: Một chuỗi JSON đại diện cho đề thi. 
+             Trả về một chuỗi JSON danh sách rỗng '[]' nếu không tìm thấy đề thi.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        # RealDictCursor trả về kết quả dưới dạng dictionary, rất tiện lợi
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Lấy tất cả câu hỏi của exam, sắp xếp theo part và id để đảm bảo thứ tự
+            cur.execute("""
+                SELECT id, part_id, topic, instruction, instruction_audio, question, image_path1, image_path2 
+                FROM speaking
+                WHERE exam_id = %s
+                ORDER BY part_id, id;
+            """, (exam_id,))
+            
+            rows = cur.fetchall()
+            
+            if not rows:
+                # Nếu không có câu hỏi nào, trả về danh sách rỗng
+                return "[]"
+
+            # Dictionary để nhóm các câu hỏi theo part_id
+            parts_data = {}
+
+            # Lặp qua các hàng kết quả để xây dựng lại cấu trúc JSON
+            for row in rows:
+                part_id = row['part_id']
+                
+                # Nếu đây là lần đầu tiên gặp part_id này
+                if part_id not in parts_data:
+                    # Tạo một mục mới cho phần này
+                    # Vì ảnh chỉ được lưu ở câu hỏi đầu tiên, ta có thể lấy luôn
+                    parts_data[part_id] = {
+                        "part": part_id,
+                        "topic": row['topic'],
+                        "instruction": row['instruction'],
+                        "instruction_audio": [],
+                        "question": [], # Khởi tạo danh sách câu hỏi rỗng
+                        "image_url_1": row['image_path1'],
+                        "image_url_2": row['image_path2']
+                    }
+                
+                parts_data[part_id]["question"].append({"id": row["id"], "text": row['question'], "audio": row['instruction_audio']})
+
+            # Chuyển đổi dictionary các giá trị thành một danh sách
+            final_result = list(parts_data.values())
+
+            # Chuyển đổi danh sách Python thành chuỗi JSON
+            return final_result
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Lỗi khi lấy dữ liệu đề thi: {error}")
+        # Ném lại lỗi để lớp cao hơn xử lý
+        raise error
+    finally:
+        if conn:
+            conn.close()
+
+def insert_writing_exam(json_data: json, exam_id: int):
+    """
+    Phân tích chuỗi JSON và ghi các câu hỏi vào bảng 'writing'.
+    Hàm này được thiết kế để hoạt động với CSDL có 2 cột ảnh riêng biệt:
+    image_path_1 và image_path_2.
+
+    Args:
+        json_data (str): Chuỗi JSON chứa dữ liệu các phần thi writing.
+        exam_id (int): ID của bài thi (exam) mà các câu hỏi này thuộc về.
+
+    Returns:
+        int: Số lượng câu hỏi đã được thêm thành công.
+    """
+    conn = None
+    questions_added_count = 0
+
+    try:
+        # Parse chuỗi JSON
+        try:
+            exam_parts = json_data
+            if not isinstance(exam_parts, list):
+                raise ValueError("JSON đầu vào phải là một danh sách (list).")
+        except json.JSONDecodeError:
+            raise ValueError("Chuỗi JSON không hợp lệ.")
+
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # Lặp qua từng phần trong JSON
+            for part_data in exam_parts:
+                part_id = part_data.get("part_id")
+                topic = part_data.get("topic")
+                instruction = part_data.get("instruction")
+                questions_list = part_data.get("questions", [])
+
+                if not isinstance(questions_list, list):
+                    continue
+
+                # Lặp qua từng câu hỏi trong danh sách để tạo một hàng trong CSDL
+                for question_text in questions_list:
+                    sql_command = """
+                        INSERT INTO writing 
+                        (exam_id, part_id, topic, instruction, questions) 
+                        VALUES (%s, %s, %s, %s, %s);
+                    """
+                    cur.execute(sql_command, (
+                        exam_id, 
+                        part_id, 
+                        topic, 
+                        instruction, 
+                        question_text
+                    ))
+                    questions_added_count += 1
+            
+            # Nếu mọi thứ thành công, commit giao dịch
+            conn.commit()
+            print(f"Thành công! Đã thêm {questions_added_count} câu hỏi vào CSDL cho exam_id={exam_id}.")
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Lỗi! Giao dịch sẽ được rollback. Chi tiết: {error}")
+        if conn:
+            conn.rollback()
+        raise error
+    finally:
+        if conn:
+            conn.close()
+    
+    return questions_added_count
+
+async def create_writing_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_set_id: int,
+    exam_part_code: str,
+    descriptions: str, # Tiêu đề chung cho phần Reading này
+    time_limit_for_part: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+    created_by_user_id: int,
+    original_file_path: Optional[str] = None # Đường dẫn đến file gốc đã lưu (nếu có)
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    with conn.cursor() as cur_validate:
+        cur_validate.execute("SELECT id FROM exam_sets WHERE id = %s", (exam_set_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
+        cur_validate.execute(
+            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'writing')
+        ) 
+        if cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"writing exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
+
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO Exams (examset_id, exam_code, exam_type, description,  time_limit, created_by_user_id, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_set_id, exam_part_code, "writing", descriptions, 
+                time_limit_for_part, created_by_user_id, True) 
+        )
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create exam record in database.")
+        
+        exam_id = exam_record['id']
+        print(f"Created Exam (WRITING Part) record with ID: {exam_id} for ExamSet ID: {exam_set_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{WRITING_FILE_DIR}/{excel_file.filename}"
+    print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        writing_json_data = aptis_writing_to_json(saved_excel_file_path_str)
+        
+        insert_writing_exam(writing_json_data, exam_id)
+        print(f"Successfully committed all parts from Excel for exam_id {exam_id}")
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+                
+
+            
+
+async def update_writing_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_id: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("SELECT id FROM exams WHERE id = %s", (exam_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
+    
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(
+            """
+            UPDATE Exams SET updated_at = now()
+            WHERE id = %s
+            RETURNING id, examset_id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_id,) 
+        )
+   
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update exam record in database.")
+        
+        exam_id = exam_record['id']
+        examset_id = exam_record['examset_id']
+        print(f"UPDATE Exam (Writing Part) record with ID: {exam_id} for Exam ID: {examset_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{WRITING_FILE_DIR}/{excel_file.filename}"
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+        print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        writing_json_data = aptis_writing_to_json(saved_excel_file_path_str)
+        
+        update_exam_by_id(exam_id, writing_json_data)
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        # delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+
+def get_writing_exam_by_id(exam_id: int) -> str:
+    """
+    Lấy dữ liệu đề thi writing từ CSDL và tái tạo lại cấu trúc JSON gốc.
+
+    Args:
+        exam_id (int): ID của bài thi (exam) cần lấy.
+
+    Returns:
+        str: Một chuỗi JSON đại diện cho đề thi. 
+             Trả về một chuỗi JSON danh sách rỗng '[]' nếu không tìm thấy đề thi.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        # RealDictCursor giúp làm việc với kết quả dưới dạng dictionary
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Lấy tất cả câu hỏi của exam, sắp xếp theo part và id
+            # ORDER BY là mệnh đề cực kỳ quan trọng ở đây
+            cur.execute("""
+                SELECT id, part_id, topic, instruction, questions 
+                FROM writing
+                WHERE exam_id = %s
+                ORDER BY part_id, id;
+            """, (exam_id,))
+            
+            rows = cur.fetchall()
+            
+            if not rows:
+                # Nếu không có câu hỏi nào, trả về danh sách JSON rỗng
+                return "[]"
+
+            # Dictionary để nhóm các câu hỏi theo part_id
+            parts_data = {}
+
+            # Lặp qua từng hàng kết quả để xây dựng lại cấu trúc JSON
+            for row in rows:
+                part_id = row['part_id']
+                
+                # Nếu đây là lần đầu tiên gặp part_id này, tạo khung cho nó
+                if part_id not in parts_data:
+                    parts_data[part_id] = {
+                        "part_id": part_id,
+                        "topic": row['topic'],
+                        "instruction": row['instruction'],
+                        "questions": [] # Khởi tạo danh sách câu hỏi rỗng
+                    }
+                
+                # Thêm câu hỏi của hàng hiện tại vào danh sách của phần đó
+                # Giả định cột chứa câu hỏi tên là 'questions' như trong migration
+                parts_data[part_id]["questions"].append(row['questions'])
+
+            # Chuyển đổi các giá trị của dictionary thành một danh sách
+            final_result = list(parts_data.values())
+
+            # Chuyển đổi danh sách Python thành chuỗi JSON đẹp mắt
+            return final_result
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Lỗi khi lấy dữ liệu đề thi writing: {error}")
+        raise error
+    finally:
+        if conn:
+            conn.close()
+
+def cleanup_orphaned_files():
+    """
+    Hàm duy nhất để thực hiện toàn bộ quá trình dọn dẹp file mồ côi.
+    Hàm này được thiết kế để chạy tự động bởi một cron job.
+    """
+    logging.info("--- Bắt đầu phiên dọn dẹp file mồ côi ---")
+    
+    # Xác định các đường dẫn tuyệt đối
+    raw_file_path = "/app/raw_file"
+    
+    # Định nghĩa các tác vụ dọn dẹp
+    cleanup_tasks = [
+        {
+            "name": "Listening Audio",
+            "directory": os.path.join(raw_file_path, 'audio'),
+            "query": """
+                SELECT audio_path FROM listening_part_1 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_2 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_3 WHERE audio_path IS NOT NULL
+                UNION ALL
+                SELECT audio_path FROM listening_part_4 WHERE audio_path IS NOT NULL;
+            """
+        },
+        {
+            "name": "Speaking Images",
+            "directory": os.path.join(raw_file_path, 'speaking', 'image'),
+            "query": """
+                SELECT image_path1 FROM speaking WHERE image_path1 IS NOT NULL
+                UNION ALL
+                SELECT image_path2 FROM speaking WHERE image_path2 IS NOT NULL;
+            """
+        },
+        {
+            "name": "Speaking Instruction Audio",
+            "directory": os.path.join(raw_file_path, 'speaking', 'instruction'),
+            "query": "SELECT instruction_audio FROM speaking WHERE instruction_audio IS NOT NULL;"
+        }
+    ]
+
+    conn = None
+    try:
+        # Bước 1: Kết nối CSDL
+        conn = get_db_connection()
+        
+        # Bước 2: Lặp qua từng tác vụ dọn dẹp
+        for task in cleanup_tasks:
+            logging.info(f"--- Bắt đầu xử lý tác vụ: {task['name']} ---")
+            
+            # 2a. Lấy danh sách các file đang được sử dụng từ CSDL
+            used_files = set()
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(task['query'])
+                    rows = cur.fetchall()
+                    for row in rows:
+                        item = dict(row)
+                        if row[list(item)[0]]:
+                            used_files.add(os.path.basename(row[list(item)[0]]))
+                except psycopg2.Error as db_err:
+                    logging.error(f"Lỗi truy vấn CSDL cho tác vụ '{task['name']}': {db_err}")
+                    continue # Bỏ qua tác vụ này và tiếp tục với tác vụ tiếp theo
+
+            logging.info(f"Tìm thấy {len(used_files)} file hợp lệ trong CSDL cho tác vụ '{task['name']}'.")
+
+            # 2b. Quét thư mục và xóa file mồ côi
+            dir_path = task['directory']
+            if not os.path.isdir(dir_path):
+                logging.warning(f"Thư mục '{dir_path}' không tồn tại. Bỏ qua tác vụ.")
+                continue
+
+            files_on_disk_count = 0
+            deleted_count = 0
+            for filename in os.listdir(dir_path):
+                full_path = os.path.join(dir_path, filename)
+                if os.path.isfile(full_path):
+                    files_on_disk_count += 1
+                    if filename not in used_files:
+                        try:
+                            os.remove(full_path)
+                            logging.info(f"Đã xóa file mồ côi: {full_path}")
+                            deleted_count += 1
+                        except OSError as os_err:
+                            logging.error(f"Lỗi khi xóa file '{full_path}': {os_err}")
+            
+            logging.info(f"Hoàn thành tác vụ '{task['name']}'. Quét {files_on_disk_count} file, đã xóa {deleted_count} file.")
+
+    except psycopg2.OperationalError as e:
+        logging.critical(f"Lỗi nghiêm trọng: Không thể kết nối tới CSDL. {e}")
+    except Exception as e:
+        logging.error(f"Đã xảy ra lỗi không mong muốn trong quá trình dọn dẹp: {e}", exc_info=True)
+    finally:
+        if conn:
+            conn.close()
+        logging.info("--- Kết thúc phiên dọn dẹp file mồ côi ---\n")

@@ -13,7 +13,7 @@ from services import auth_service, exam_service, exam_set_service
 
 router = APIRouter(
     prefix="/api/guest",
-    tags=["Member - User Management"],
+    tags=["Guest - User Management"],
     dependencies=[], # Áp dụng cho tất cả các route trong router này
     responses={
         401: {"description": "Not authenticated"},
@@ -44,7 +44,7 @@ async def get_exam_set_endpoint(
     exam_set_id: int,
     current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
-    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id)
+    exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id, current_user)
     return ExamSetResponseSchema(**exam_set)
 
 @router.get("/exam/{exam__id}")
@@ -52,19 +52,28 @@ async def get_exam_set_endpoint(
     exam__id: int,
     current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
+    """
+    Lấy ra nội dung đề thi thử
+    """
     exam_set = exam_service.get_exam_by_id(exam__id)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
-@router.post("/exam-audio")
+@router.post("/exam-file")
 async def get_audio_path_listening(
     item: AudioPath,
     current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
+    """
+    lấy file audio của phần listening
+    """
     file = exam_service.load_audio_as_base64(item.audio_path, )
-    response = {"audio": file}
+    response = {"base64": file}
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 @router.post("/info")
 async def insert_guest_info_endpoint(item: GuestInsertSchema):
+    """
+    Guest điền thông tin
+    """
     return JSONResponse(status_code=status.HTTP_200_OK, content = insert_guest_info(item.fullname, item.phone_number))
 
