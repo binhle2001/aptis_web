@@ -1313,7 +1313,7 @@ def download_all_images():
 def create_instruction_audio():
     conn = get_db_connection()
     cursor = conn.cursor()
-    print("nguuuuu")
+    
     for i in range(1, 5):
         cursor.execute("SELECT id, instruction, topic, instruction_audio, question FROM speaking WHERE part_id = %s", (i,))
         rows = cursor.fetchall()
@@ -1326,6 +1326,7 @@ def create_instruction_audio():
                 topic = row["topic"]
                 text = question
                 print("text ->", text)
+                print(output_path)
                 audio_instruction = speak_EN(text, output_path = output_path)
                 cursor.execute("UPDATE speaking SET instruction_audio = %s WHERE id = %s", (audio_instruction, question_id))
                 conn.commit()
