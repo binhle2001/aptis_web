@@ -35,6 +35,9 @@ def get_text(text, hps):
     return text_norm
 
 def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app/raw_file/speaking/instruction/audio.mp3"):
+    temp_dir = "/app/ai_tools/data_temp"
+    shutil.rmtree(temp_dir, ignore_errors=True)
+    os.makedirs(temp_dir, exist_ok=True)
     pretrained_path = "/app/ai_tools/model/pretrained_ljs.pth"
     weight_url = "https://drive.google.com/file/d/1ut7UkshBXGbe5ElQkaOIeUULb2I1tO48/view?usp=sharing"
     if not os.path.isfile(pretrained_path):
@@ -51,21 +54,31 @@ def speak_EN(text, speed: float = 1.0, vocal:str = "female", output_path = "/app
         _ = net_g.eval()
 
         _ = utils.load_checkpoint(pretrained_path, net_g, None)   
-    
-    stn_tst = get_text(text, hps)
-    with torch.no_grad():
-        if vocal == "female": 
-            x_tst = stn_tst.unsqueeze(0)
-            x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
-            audio = net_g.infer(x_tst, x_tst_lengths, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
-        else: 
-            x_tst = stn_tst.unsqueeze(0)
-            x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
-            sid = torch.LongTensor([4])
-            audio = net_g.infer(x_tst, x_tst_lengths, sid=sid, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
-        sf.write(output_path, audio, int(hps.data.sampling_rate * speed))
+    if isinstance(text, str):
+        text = text.replace("\n", ". ")
+        output_file = f"{temp_dir}/{i:04d}.mp3"
+        i+= 1
+        stn_tst = get_text(text, hps)
+        with torch.no_grad():
+            if vocal == "female": 
+                x_tst = stn_tst.unsqueeze(0)
+                x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
+                audio = net_g.infer(x_tst, x_tst_lengths, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
+            else: 
+                x_tst = stn_tst.unsqueeze(0)
+                x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
+                sid = torch.LongTensor([4])
+                audio = net_g.infer(x_tst, x_tst_lengths, sid=sid, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
+            sf.write(output_file, audio, int(hps.data.sampling_rate * speed))
+        
+        file_names = [output_file, AUDIO_BEEP]
+        audio_segments = [AudioSegment.from_file(file_name) for file_name in file_names]
+        
+        audio = sum(audio_segments)
+        audio.export(output_path, format="mp3")
+        del net_g, hps, audio, audio_segments
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return output_path
 
-    del net_g, hps, audio, audio_segments
-    return output_path
     
 

@@ -1325,8 +1325,6 @@ def create_instruction_audio():
                 question = row["question"]
                 topic = row["topic"]
                 text = question
-                print("text ->", text)
-                print(output_path)
                 audio_instruction = speak_EN(text, output_path = output_path)
                 cursor.execute("UPDATE speaking SET instruction_audio = %s WHERE id = %s", (audio_instruction, question_id))
                 conn.commit()

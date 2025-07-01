@@ -43,7 +43,7 @@ def put_exam_submission(user_id, exam_id, submission_data, score = None,):
                            (user_id, exam_id, score, answer_string, True))
         else:
             cursor.execute("""INSERT INTO exam_submission (user_id, exam_id, answer_string) 
-                           VALUES (%s, %s, %s, %s, %s) 
+                           VALUES (%s, %s, %s) 
                            RETURNING id, user_id, exam_id, score, is_scored;""", 
                            (user_id, exam_id, answer_string))
         conn.commit()
