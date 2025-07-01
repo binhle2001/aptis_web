@@ -17,7 +17,7 @@ async def create_new_user(user_data: UserCreateSchema) -> dict: # Trả về dic
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra username đã tồn tại chưa
-            cur.execute("SELECT id FROM Users WHERE WHERE LOWER(username) = LOWER(%s)", (user_data.username,))
+            cur.execute("SELECT id FROM Users WHERE LOWER(username) = LOWER(%s)", (user_data.username,))
             if cur.fetchone():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
