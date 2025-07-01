@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, File, Uplo
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from services.submission_services import get_list_submission, get_submission_by_id, update_exam_submission
-from services.guest_service import call_guest, delete_guest, get_list_guest
+from services.guest_service import call_guest, delete_guest, get_list_guest, recall_guest
 from schemas.user_schema import ExamSubmissionSchema, GuestResponseSchema, UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema, MessageResponseSchema, UserListResponseSchema
 from services import user_service, exam_service, exam_set_service 
 from core.deps import get_current_admin_user # Dependency để xác thực Admin
@@ -557,6 +557,13 @@ async def call_guest_endpoint(guest_id: int, current_admin: Annotated[dict, Depe
     Thay đổi trạng thái của guest
     """
     return call_guest(guest_id)
+
+@router.patch("/guest/{guest_id}/unmask")
+async def recall_guest_endpoint(guest_id: int, current_admin: Annotated[dict, Depends(get_current_admin_user)]):
+    """
+    Thay đổi trạng thái của guest
+    """
+    return recall_guest(guest_id)
 
 
 @router.delete("/guest/{guest_id}")
