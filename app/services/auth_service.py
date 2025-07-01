@@ -115,7 +115,7 @@ async def create_sample_user(username, password, fullname, role="member"):
         conn = get_db_connection()
         with conn.cursor() as cur:
             # Kiểm tra xem user đã tồn tại chưa
-            cur.execute("SELECT username FROM Users WHERE WHERE LOWER(username) = LOWER(%s)", (username,))
+            cur.execute("SELECT username FROM Users WHERE LOWER(username) = LOWER(%s)", (username,))
             if cur.fetchone():
                 print(f"User '{username}' already exists.")
                 return
