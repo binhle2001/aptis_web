@@ -495,6 +495,13 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
                 """,
                 (user_id_to_delete,)
             )
+            cur.execute(
+                """
+                DELETE FROM exam_submission WHERE user_id = %s;
+                """,
+                (user_id_to_delete,)
+            )
+            
             
             if cur.rowcount == 0:
                 conn.rollback()
