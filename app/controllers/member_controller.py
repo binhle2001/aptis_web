@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Annotated, Optional
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện hơn UserLoginSchema cho form data
@@ -107,7 +109,11 @@ async def post_audio_file_endpoint(
     """
 
     user_id = current_user.get("id")
-    saved_audio_file_path_str = f"{SPEAKING_SUBMISSION_DIR}/{question_id}_{user_id}.mp3"
+    time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    random_id = uuid.uuid4().hex[:8]  # lấy 8 ký tự đầu để gọn
+    filename = f"{question_id}_{user_id}_{time_str}_{random_id}.mp3"
+
+    saved_audio_file_path_str = f"{SPEAKING_SUBMISSION_DIR}/{filename}"
     # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
     save_base64_to_audio_file(item.audio, saved_audio_file_path_str)
     return JSONResponse(status_code=status.HTTP_200_OK, content = {"audio_path": saved_audio_file_path_str})
