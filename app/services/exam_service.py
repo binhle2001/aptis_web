@@ -128,7 +128,11 @@ def insert_reading_part3_json(json_data, exam_id):
         "Person_A": "A",
         "Person_B": "B",
         "Person_C": "C",
-        "Person_D": "D"
+        "Person_D": "D",
+        "Person A": "A",
+        "Person B": "B",
+        "Person C": "C",
+        "Person D": "D",
     }
 
     values = []
@@ -141,7 +145,7 @@ def insert_reading_part3_json(json_data, exam_id):
 
         for q in group["questions"]:
             question_text = q["text"]
-            correct_person = q["correct_answer"]
+            correct_person = q["correct_answer"].strip()
             correct_answer = person_map.get(correct_person, "?")  # fallback ?
 
             values.append((
