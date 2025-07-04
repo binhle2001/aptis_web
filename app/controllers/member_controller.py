@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Annotated, Optional
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm # Dùng cái này tiện hơn UserLoginSchema cho form data
@@ -10,10 +12,10 @@ from schemas.auth_schema import TokenSchema, UserLoginSchema
 from schemas.exam_schema import AudioPath
 from schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
 from services import auth_service, exam_service, exam_set_service
-
+import os 
 
 SPEAKING_SUBMISSION_DIR = "/app/raw_file/speaking/submission"
-
+os.makedirs(SPEAKING_SUBMISSION_DIR, exist_ok=True)
 router = APIRouter(
     prefix="/api/user",
     tags=["Member - User Management"],
@@ -77,7 +79,7 @@ async def get_audio_path_listening(
     return JSONResponse(status_code=status.HTTP_200_OK, content = response)
 
 @router.post("/exam/{exam_id}/submission")
-async def put_exam_submisstion_endpoint(exam_id, item: ExamSubmissionSchema, current_user: Annotated[dict, Depends(get_current_member_user)]):
+async def put_exam_submission_endpoint(exam_id, item: ExamSubmissionSchema, current_user: Annotated[dict, Depends(get_current_member_user)]):
     """
     Đẩy bài làm 
     """
@@ -99,7 +101,7 @@ async def get_submission_endpoint(submission_id: int):
 @router.post("/question/{question_id}/audio")
 async def post_audio_file_endpoint(
     question_id: int,
-    audio_file: SpeakingAudioSchema,
+    item: SpeakingAudioSchema,
     current_user: Annotated[dict, Depends(get_current_member_user)] = None
 ):
     """
@@ -107,9 +109,13 @@ async def post_audio_file_endpoint(
     """
 
     user_id = current_user.get("id")
-    saved_audio_file_path_str = f"{SPEAKING_SUBMISSION_DIR}/{question_id}_{user_id}.mp3"
+    time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    random_id = uuid.uuid4().hex[:8]  # lấy 8 ký tự đầu để gọn
+    filename = f"{question_id}_{user_id}_{time_str}_{random_id}.mp3"
+
+    saved_audio_file_path_str = f"{SPEAKING_SUBMISSION_DIR}/{filename}"
     # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
-    save_base64_to_audio_file(audio_file, saved_audio_file_path_str)
+    save_base64_to_audio_file(item.audio, saved_audio_file_path_str)
     return JSONResponse(status_code=status.HTTP_200_OK, content = {"audio_path": saved_audio_file_path_str})
 
     

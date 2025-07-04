@@ -10,10 +10,10 @@ from datetime import timedelta
 def insert_guest_info(fullname, phone_number):
     conn = get_db_connection()
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
-        cur_validate.execute("Select id FROM guest Where fullname = %s OR phone_number = %s", (fullname, phone_number))
+        cur_validate.execute("Select id FROM guest Where phone_number = %s", (phone_number,))
         row = cur_validate.fetchone()
         if row:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Full name or phone number have already existed!")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Phone number have already existed!")
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO guest (fullname, phone_number) VALUES (%s, %s) RETURNING id, fullname, phone_number, created_at", (fullname, phone_number))
@@ -31,7 +31,7 @@ def insert_guest_info(fullname, phone_number):
                 data=access_token_data, expires_delta=access_token_expires
             )
 
-        return {"access_token": access_token, "token_type": "bearer"}
+        return JSONResponse(status_code=status.HTTP_200_OK, content = {"access_token": access_token, "token_type": "bearer"})
     except Exception as e:
         conn.rollback()
         raise e
@@ -58,6 +58,27 @@ def call_guest(guest_id):
     finally:
         cursor.close()
         conn.close()
+
+def recall_guest(guest_id):
+    conn = get_db_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("Select * FROM guest Where id = %s", (guest_id,))
+        row = cur_validate.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Guest with {guest_id} not exist!")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE guest SET is_called = %s Where id = %s", (False, guest_id))
+        conn.commit()
+        return JSONResponse(status_code=status.HTTP_200_OK, content = {"message": "success"})
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+
+
 
 def get_list_guest(
     page: int = 1,

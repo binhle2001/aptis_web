@@ -17,7 +17,7 @@ async def create_new_user(user_data: UserCreateSchema) -> dict: # Trả về dic
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 1. Kiểm tra username đã tồn tại chưa
-            cur.execute("SELECT id FROM Users WHERE WHERE LOWER(username) = LOWER(%s)", (user_data.username,))
+            cur.execute("SELECT id FROM Users WHERE LOWER(username) = LOWER(%s)", (user_data.username,))
             if cur.fetchone():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -495,6 +495,13 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
                 """,
                 (user_id_to_delete,)
             )
+            cur.execute(
+                """
+                DELETE FROM exam_submission WHERE user_id = %s;
+                """,
+                (user_id_to_delete,)
+            )
+            
             
             if cur.rowcount == 0:
                 conn.rollback()

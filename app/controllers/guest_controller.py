@@ -75,5 +75,5 @@ async def insert_guest_info_endpoint(item: GuestInsertSchema):
     """
     Guest điền thông tin
     """
-    return JSONResponse(status_code=status.HTTP_200_OK, content = insert_guest_info(item.fullname, item.phone_number))
+    return insert_guest_info(item.fullname, item.phone_number)
 
