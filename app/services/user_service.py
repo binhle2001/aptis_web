@@ -502,13 +502,6 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
                 (user_id_to_delete,)
             )
             
-            
-            if cur.rowcount == 0:
-                conn.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, # Hoặc 500
-                    detail=f"User with ID {user_id_to_delete} not found during reactivation, or no changes made."
-                )
 
             conn.commit()
             print(f"User ID {user_id_to_delete} is deleted by admin {admin_username}.")
