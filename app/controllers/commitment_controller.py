@@ -1,9 +1,11 @@
 # /api/commitment_api.py
 
 import base64
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from helpers.common import get_env_var
 from core.deps import get_current_member_user
 from services import commitment_service
 from schemas.user_schema import CommitmentSchema
@@ -45,3 +47,29 @@ async def generate_commitment_endpoint(data: CommitmentSchema):
             status_code=500, 
             detail=f"Đã xảy ra lỗi khi tạo tài liệu: {str(e)}"
         )
+        
+        
+@router.post("/send_commitment_email")
+def send_commitment(data: CommitmentSchema):
+    output_filename = f"/app/raw_file/commitments/commitment_{data.email.replace('.', '_')}.jpg"
+
+    # Kiểm tra file có tồn tại không
+    if not os.path.exists(output_filename):
+        return {"error": "Ảnh bản cam kết chưa được tạo."}
+
+    try:
+        service = commitment_service.authenticate_gmail()
+        subject = "Bản cam kết đầu ra khóa học Aptis - Aptis One"
+        body = f"Kính gửi bạn {data.student_name}, Trung tâm AptisOne xin gửi bạn bản cam kết đầu ra của khóa học. Chúc bạn đạt được đầu ra mong muốn."
+
+        commitment_service.send_email_with_attachment(
+            service=service,
+            sender=get_env_var('GMAIL', 'SENDER_EMAIL'),  # Gmail đã đăng nhập qua OAuth2
+            recipient=data.email,
+            subject=subject,
+            body_text=body,
+            file_path=output_filename
+        )
+        return {"message": "Email sent successfully"}
+    except Exception as e:
+        return {"error": str(e)}

@@ -1,15 +1,23 @@
 import io
 import base64
 import os
-
+import os
+import base64
+import pickle
+from email.mime.text import MIMEText
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 from PIL import Image
 import base64
 import io
 import textwrap
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
-
+from google.oauth2.credentials import Credentials
 from schemas.user_schema import CommitmentSchema
+from email.message import EmailMessage
+
 
 def generate_filled_commitment(data: CommitmentSchema, template_path: str = "commitment_template.png") -> str:
     """
@@ -107,7 +115,7 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
     # --- Lưu file kết quả ---
     final_image_rgb = image.convert("RGB")
     os.makedirs("/app/raw_file/commitments", exist_ok=True)
-    output_filename = f"/app/raw_file/commitments/commitment_{data.student_name.replace(' ', '_')}.jpg"
+    output_filename = f"/app/raw_file/commitments/commitment_{data.email.replace('.', '_')}.jpg"
     final_image_rgb.save(output_filename, "jpeg", quality=95)
     
     print("-" * 50)
@@ -116,3 +124,48 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
     print("-" * 50)
     
     return output_filename
+
+
+
+
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+
+def authenticate_gmail():
+    creds = None
+    TOKEN_PATH = "token.json"
+    CREDENTIALS_PATH = "credentials.json"
+    if os.path.exists(TOKEN_PATH):
+        with open(TOKEN_PATH, 'rb') as token:
+            creds = pickle.load(token)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_PATH, 'wb') as token:
+            pickle.dump(creds, token)
+
+    return build('gmail', 'v1', credentials=creds)
+
+def send_email_with_attachment(service, sender, recipient, subject, body_text, file_path):
+    message = EmailMessage()
+    message.set_content(body_text)
+    message['To'] = recipient
+    message['From'] = sender
+    message['Subject'] = subject
+
+    with open(file_path, 'rb') as f:
+        file_data = f.read()
+        file_name = os.path.basename(file_path)
+        message.add_attachment(file_data, maintype='image', subtype='jpeg', filename=file_name)
+
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    create_message = {'raw': encoded_message}
+
+    send_message = service.users().messages().send(userId="me", body=create_message).execute()
+    print(f'Message Id: {send_message["id"]}')
+    return send_message
+
+

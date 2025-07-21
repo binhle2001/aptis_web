@@ -8,3 +8,5 @@ app/ai_tools/data_temp
 venv
 test.py
 test2.py
+app/credentials.json
+app/token.json
