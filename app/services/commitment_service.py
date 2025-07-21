@@ -1,0 +1,118 @@
+import io
+import base64
+import os
+
+from PIL import Image
+import base64
+import io
+import textwrap
+from PIL import Image, ImageDraw, ImageFont
+from datetime import datetime
+
+from schemas.user_schema import CommitmentSchema
+
+def generate_filled_commitment(data: CommitmentSchema, template_path: str = "commitment_template.png") -> str:
+    """
+    Nạp ảnh template 'commitment_template_v2.png', điền thông tin và chữ ký
+    với tọa độ đã được canh chỉnh thủ công chính xác, sau đó xuất file JPG.
+    """
+    date_now = datetime.now()
+    date = str(date_now.day)
+    month = str(date_now.month)
+    year = str(date_now.year)
+    try:
+        image = Image.open(template_path).convert("RGBA")
+        draw = ImageDraw.Draw(image)
+        
+        # Font để điền dữ liệu, kích thước phù hợp với template HD
+        font_data = ImageFont.truetype("times.ttf", 38)
+        font_data_bold = ImageFont.truetype("timesbd.ttf", 38)
+        data_color = (0, 0, 0) # Màu xanh đậm
+        black_color = (0, 0, 0)
+    except FileNotFoundError as e:
+        print(f"LỖI: Không tìm thấy file template '{template_path}'.")
+        print("Hãy đảm bảo bạn đã tạo file này từ bước trước.")
+        raise e
+    except IOError as e:
+        print("LỖI: Không tìm thấy file font chữ. Hãy đặt 'times.ttf' và 'timesbd.ttf' vào cùng thư mục.")
+        raise e
+
+    # --- DICTIONARY TỌA ĐỘ (ĐÃ ĐO BẰNG TAY, ĐẢM BẢO CHÍNH XÁC) ---
+    COORDINATES = {
+        'date_now': (1466, 286),
+        'month_now': (1627, 286),
+        'year_now': (1751, 286),
+        'student_name': (450, 793),
+        'date_of_birth': (300, 846),
+        'national_id': (880, 846),
+        'issue_date': (308, 896),
+        'address': (820, 896),
+        'phone': (310, 946),
+        'email': (830, 946),
+        'start_date': (342, 1046),
+        'end_date': (825, 1046),
+        'target_output': (1347, 1046),
+        'course_registered': (420, 1096),
+        'fee_paid': (260, 1146),
+        'fee_deadline': (1165, 1146),
+        'commitment_output': (870, 1246),
+        'student_name_inline': (630, 3846), # Vị trí chèn tên vào đoạn văn
+        'student_signature_paste': (1300, 4430), # Tọa độ dán chữ ký BÊN B
+        'student_name_signature': (1387, 4557),   # Tọa độ viết tên BÊN B
+    }
+
+    # --- Điền thông tin văn bản lên ảnh ---
+    draw.text(COORDINATES['date_now'], date, font=font_data_bold, fill=data_color)
+    draw.text(COORDINATES['month_now'], month, font=font_data_bold, fill=data_color)
+    draw.text(COORDINATES['year_now'], year, font=font_data_bold, fill=data_color)
+    draw.text(COORDINATES['student_name'], data.student_name, font=font_data_bold, fill=data_color)
+    draw.text(COORDINATES['date_of_birth'], data.date_of_birth, font=font_data, fill=data_color)
+    draw.text(COORDINATES['national_id'], data.national_id, font=font_data, fill=data_color)
+    draw.text(COORDINATES['issue_date'], data.issue_date, font=font_data, fill=data_color)
+    draw.text(COORDINATES['phone'], data.phone, font=font_data, fill=data_color)
+    draw.text(COORDINATES['email'], data.email, font=font_data, fill=data_color)
+    draw.text(COORDINATES['start_date'], data.start_date, font=font_data, fill=data_color)
+    draw.text(COORDINATES['end_date'], data.end_date, font=font_data, fill=data_color)
+    draw.text(COORDINATES['target_output'], data.target_output, font=font_data, fill=data_color)
+    draw.text(COORDINATES['course_registered'], data.course_registered, font=font_data, fill=data_color)
+    draw.text(COORDINATES['fee_paid'], data.fee_paid, font=font_data, fill=data_color)
+    draw.text(COORDINATES['fee_deadline'], data.fee_deadline, font=font_data, fill=data_color)
+    draw.text(COORDINATES['commitment_output'], data.commitment_output, font=font_data, fill=data_color)
+    draw.text(COORDINATES['student_name_inline'], data.student_name, font=font_data_bold, fill=data_color)
+
+    # Xử lý riêng cho địa chỉ để tự động xuống dòng
+    address_lines = textwrap.wrap(data.address, width=55)
+    y_address = COORDINATES['address'][1]
+    for line in address_lines:
+        draw.text((COORDINATES['address'][0], y_address), line, font=font_data, fill=data_color)
+        y_address += 50 # Khoảng cách giữa các dòng của địa chỉ
+
+    # --- Xử lý và dán chữ ký của học viên (Bên B) ---
+    if data.signature_base64:
+        try:
+            base64_string = data.signature_base64.split(',')[-1]
+            signature_bytes = base64.b64decode(base64_string)
+            student_sig_img = Image.open(io.BytesIO(signature_bytes))
+            student_sig_img.thumbnail((325, 150)) # Resize chữ ký
+
+            # Dán ảnh chữ ký lên template
+            image.paste(student_sig_img, COORDINATES['student_signature_paste'], mask=student_sig_img)
+
+            # Ghi tên học viên dưới chữ ký (dùng anchor="mt" để tự động canh giữa)
+            draw.text(COORDINATES['student_name_signature'], data.student_name, font=font_data_bold, fill=black_color, anchor="mt")
+        
+        except Exception as e:
+            print(f"LỖI: Không thể xử lý ảnh chữ ký của học viên: {e}")
+
+    # --- Lưu file kết quả ---
+    final_image_rgb = image.convert("RGB")
+    os.makedirs("/app/raw_file/commitments", exist_ok=True)
+    output_filename = f"/app/raw_file/commitments/commitment_{data.student_name.replace(' ', '_')}.jpg"
+    final_image_rgb.save(output_filename, "jpeg", quality=95)
+    
+    print("-" * 50)
+    print(f"✅ Đã tạo ảnh cam kết hoàn chỉnh thành công!")
+    print(f"   File được lưu tại: {output_filename}")
+    print("-" * 50)
+    
+    return output_filename

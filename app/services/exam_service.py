@@ -2080,7 +2080,6 @@ def cleanup_orphaned_files():
                             try:
                                 answer_string = row["answer_string"]
                                 data = json.loads(answer_string or '{}')
-                                print(data)
                                 for path in data.get('audioPaths', []):
                                     used_files.add(os.path.basename(path))
                             except json.JSONDecodeError:
@@ -2090,7 +2089,6 @@ def cleanup_orphaned_files():
                             item = dict(row)
                             if row[list(item)[0]]:
                                 used_files.add(os.path.basename(row[list(item)[0]]))
-                    print("used_files", used_files)
                 except psycopg2.Error as db_err:
                     logging.error(f"Lỗi truy vấn CSDL cho tác vụ '{task['name']}': {db_err}")
                     continue
