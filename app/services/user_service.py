@@ -4,10 +4,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import HTTPException, status
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+
 from PIL import Image
 
 from schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema

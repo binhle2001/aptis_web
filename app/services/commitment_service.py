@@ -107,7 +107,7 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
     # --- Lưu file kết quả ---
     final_image_rgb = image.convert("RGB")
     os.makedirs("/app/raw_file/commitments", exist_ok=True)
-    output_filename = f"/app/raw_file/commitments/commitment_{data.student_name.replace(' ', '_')}.jpg"
+    output_filename = f"/app/raw_file/commitments/commitment_{data.email.replace('.', '_')}.jpg"
     final_image_rgb.save(output_filename, "jpeg", quality=95)
     
     print("-" * 50)
