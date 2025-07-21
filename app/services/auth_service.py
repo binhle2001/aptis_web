@@ -50,51 +50,95 @@ async def login_for_access_token(form_data: UserLoginSchema):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT id, username, password_hash, role, fullname, is_active FROM Users WHERE LOWER(username) = LOWER(%s);", (form_data.username,))
+            # 1. Lấy thông tin user
+            cur.execute("""
+                SELECT id, username, password_hash, role, fullname, is_active, deviceid1, deviceid2
+                FROM users
+                WHERE LOWER(username) = LOWER(%s);
+            """, (form_data.username,))
             user_in_db = cur.fetchone()
-        if not user_in_db:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        if not user_in_db["is_active"]:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User inactive",
-                headers={"is_active": "false"},
-            )
-        
 
-        # In a real app, ensure user_in_db['is_active'] is checked if you have such a field
-        # if not user_in_db.get('is_active', True): # Giả sử is_active mặc định là True nếu không có
-        #     raise HTTPException(status_code=400, detail="Inactive user")
+            if not user_in_db:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
 
-        if not verify_password(form_data.password, user_in_db["password_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            if not user_in_db["is_active"]:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User inactive",
+                    headers={"is_active": "false"},
+                )
 
+            # 2. Xác thực mật khẩu
+            if not verify_password(form_data.password, user_in_db["password_hash"]):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
+            # 3. Kiểm tra giới hạn thiết bị, bỏ qua với admin và Phuc32
+            username_lower = user_in_db["username"].lower()
+            if username_lower not in ("admin", "phuc32"):
+                device_id = form_data.device_id
+                dev1 = user_in_db["deviceid1"]
+                dev2 = user_in_db["deviceid2"]
+                
+                if dev1 and dev1 == device_id:
+                    # đã match deviceid1 → pass
+                    pass
+                elif dev2 and dev2 == device_id:
+                    # đã match deviceid2 → pass
+                    pass
+                else:
+                    # chưa match cả hai
+                    if not dev1:
+                        # thêm vào deviceid1
+                        cur.execute(
+                            "UPDATE users SET deviceid1 = %s WHERE id = %s;",
+                            (device_id, user_in_db["id"])
+                        )
+                        conn.commit()
+                    elif not dev2:
+                        # thêm vào deviceid2
+                        cur.execute(
+                            "UPDATE users SET deviceid2 = %s WHERE id = %s;",
+                            (device_id, user_in_db["id"])
+                        )
+                        conn.commit()
+                    else:
+                        # cả hai cột đều đã có giá trị khác device_id → reject
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Device limit reached. Please use a registered device.",
+                        )
+
+        # 4. Tạo token và trả về
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token_data = {
-            "sub": user_in_db["username"], # "sub" is a standard claim for subject (username)
+            "sub": user_in_db["username"],
             "id": user_in_db["id"],
+            'is_active': user_in_db["is_active"],
+            'is_commited': user_in_db["is_commited"],
             "role": user_in_db["role"],
-            "fullname": user_in_db["fullname"]
-            # Bạn có thể thêm các thông tin khác vào payload của token nếu cần
+            "fullname": user_in_db["fullname"],
         }
-       
         access_token = create_access_token(
             data=access_token_data, expires_delta=access_token_expires
         )
-        return {"access_token": access_token, "token_type": "bearer", "user_role": user_in_db["role"]}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_role": user_in_db["role"],
+        }
+
     except HTTPException:
-        raise # Re-raise HTTPException để FastAPI xử lý
+        raise  # Để FastAPI xử lý tiếp
     except Exception as e:
-        # Log the error for debugging
-        print(f"An unexpected error occurred during login: {e}")
+        print(f"Unexpected login error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred during login."
@@ -102,7 +146,9 @@ async def login_for_access_token(form_data: UserLoginSchema):
     finally:
         if conn:
             conn.close()
-
+            
+            
+            
 # --- Hàm tiện ích để tạo user mẫu (chạy một lần hoặc khi cần) ---
 async def create_sample_user(username, password, fullname, role="member"):
     """

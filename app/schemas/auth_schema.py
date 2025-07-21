@@ -3,12 +3,13 @@ from pydantic import BaseModel, Field
 class UserLoginSchema(BaseModel):
     username: str = Field(..., example="testuser", description="Login username")
     password: str = Field(..., example="password123", description="Login password")
-
+    device_id: str = Field(..., example="device1", description="Device id for login")
     class Config:
         json_schema_extra = {
             "example": {
                 "username": "testuser",
-                "password": "strongpassword"
+                "password": "strongpassword",
+                "device_id": "device_id"
             }
         }
 
