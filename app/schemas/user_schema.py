@@ -155,3 +155,42 @@ class SpeakingAudioSchema(BaseModel):
                 "audio": "base64",
             }
         }
+
+
+class CommitmentSchema(BaseModel):
+    student_name: str = Field(..., example="Nguyễn Văn An")
+    date_of_birth: str = Field(..., example="01/01/2000")
+    national_id: str = Field(..., example="012345678910")
+    issue_date: str = Field(..., example="15/06/2020")
+    address: str = Field(..., example="Số 1, Đường ABC, Phường XYZ, Quận 1, TP. HCM")
+    phone: str = Field(..., example="0987654321")
+    email: str = Field(..., example="an.nguyen@email.com")
+    start_date: str = Field(..., example="01/08/2025")
+    end_date: str = Field(..., example="01/11/2025")
+    target_output: str = Field(..., example="B1 Tương đương 4.0 IELTS")
+    course_registered: str = Field(..., example="Luyện thi Aptis cấp tốc")
+    fee_paid: str = Field(..., example="5,000,000")
+    fee_deadline: str = Field(..., example="01/08/2025")
+    commitment_output: str = Field(..., example="Đạt chứng chỉ Aptis B1")
+    signature_base64: str = Field(..., description="Ảnh chữ ký dưới dạng chuỗi Base64 (có thể có hoặc không có tiền tố data URI)", example="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "student_name": "Trần Thị B",
+                "date_of_birth": "15/05/1999",
+                "national_id": "098765432109",
+                "issue_date": "10/10/2021",
+                "address": "123 Đường Cầu Giấy, Dịch Vọng, Cầu Giấy, Hà Nội",
+                "phone": "0123456789",
+                "email": "b.tran@gmail.com",
+                "start_date": "20/07/2025",
+                "end_date": "20/09/2025",
+                "target_output": "Aptis B2",
+                "course_registered": "Aptis Nâng cao",
+                "fee_paid": "4,500,000 VNĐ",
+                "fee_deadline": "20/07/2025",
+                "commitment_output": "Đảm bảo đầu ra Aptis B2",
+                "signature_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPoAAABkCAYAAACfIFoNAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEYSURBVHhe7cExAQAAAMKg9U9tB2+g408gAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4NIgAAAZS7q3kAAAAASUVORK5CYII="
+            }
+        }

@@ -1,9 +1,11 @@
+import io
 import json
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import HTTPException, status
 
+from PIL import Image
 
 from schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema
 from core.security import get_password_hash
@@ -532,4 +534,4 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
             conn.close()
             
 
-    
+
