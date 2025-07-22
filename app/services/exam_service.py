@@ -1162,7 +1162,7 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
                 "topic":           first['topic'],
                 "audio_link":      first['audio_link'],
                 "questions":       [r['question']        for r in rows3],
-                "correct_answers": [r['correct_answer']  for r in rows3]
+                "correct_answers": [r['correct_answer'].strip()  for r in rows3]
             }
             result['part3'] = [block3]
         else:
