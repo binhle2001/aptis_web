@@ -11,7 +11,7 @@ import os
 from psycopg2.extras import execute_values
 import requests
 from ai_tools.EN.inference import speak_EN
-from helpers.excel_parser import aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
+from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
 SPEAKING_FILES_DIR = "/app/raw_file/speaking/excel"
@@ -19,12 +19,16 @@ SPEAKING_IMAGES_DIR = "/app/raw_file/speaking/image"
 LISTENING_FILES_DIR = "/app/raw_file/listening"
 AUDIO_FILES_DIR = "/app/raw_file/audio"
 WRITING_FILE_DIR = "/app/raw_file/writing"
+GV_FILES_DIR = "/app/raw_file/GV"
 os.makedirs(READING_FILES_DIR, exist_ok=True)
 os.makedirs(LISTENING_FILES_DIR, exist_ok=True)
 os.makedirs(AUDIO_FILES_DIR, exist_ok=True)
 os.makedirs(SPEAKING_IMAGES_DIR, exist_ok=True)
 os.makedirs(SPEAKING_FILES_DIR, exist_ok=True)
 os.makedirs(WRITING_FILE_DIR, exist_ok=True)
+os.makedirs(GV_FILES_DIR, exist_ok=True)
+
+
 def insert_reading_part1_json(json_data, exam_id):
     """
     Chèn dữ liệu Part 1 Reading từ JSON vào bảng reading_part_1.
@@ -253,10 +257,11 @@ def delete_exam_data(exam_id):
             "speaking",
             "writing",
             "exam_submission",
-            'exams'
+            'g_v_part1',
+            'g_v_part2'
         ]
 
-        for table in tables[:-1]:
+        for table in tables:
             cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
 
         # Xóa exam cuối cùng
@@ -268,7 +273,7 @@ def delete_exam_data(exam_id):
         print(f"✅ Đã xóa toàn bộ dữ liệu của exam_id = {exam_id}")
     except Exception as e:
         print("❌ Lỗi khi xóa dữ liệu:", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Reading exam part with code '{exam_id}' Error.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f" exam part with code '{exam_id}' Error.")
 
 async def create_reading_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
     exam_set_id: int,
@@ -515,6 +520,8 @@ def get_exam_by_id(exam_id):
             return get_speaking_exam_by_id(exam_id)
         elif exam_type == "writing":
             return get_writing_exam_by_id(exam_id)
+        elif exam_type == "g_v":
+            return get_gv_exam_by_id(exam_id)
     except HTTPException:
         if conn:
             conn.rollback()
@@ -533,7 +540,7 @@ def update_exam_by_id(exam_id, json_content):
         conn = get_db_connection() 
         # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
-            cur_validate.execute("SELECT id, exam_type FROM exams WHERE id = %s", (exam_id,))
+            cur_validate.execute("SELECT id, exam_type FROM exams WHERE id = %s", (exam_id,)) 
             row = cur_validate.fetchone()
             if not row:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
@@ -601,6 +608,17 @@ def update_exam_by_id(exam_id, json_content):
                 cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
             conn.commit()
             insert_writing_exam(json_content, exam_id)
+            return "success"
+        if row["exam_type"] == "g_v":
+            tables = [
+                'g_v_part1',
+                'g_v_part2'
+            ]
+
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table} WHERE exam_id = %s", (exam_id,))
+            conn.commit()
+            insert_g_v_exam(json_content, exam_id)
             return "success"
     except HTTPException:
         if conn:
@@ -2134,3 +2152,378 @@ def cleanup_orphaned_files():
         if conn:
             conn.close()
         logging.info("--- Kết thúc phiên dọn dẹp file mồ côi ---\n")
+
+def insert_g_v_exam(json_data, exam_id):
+    # Kết nối database
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Đọc dữ liệu từ file JSON
+    
+    try:
+        # Xử lý part1
+        for item in json_data['part1']:
+            cur.execute("""
+                INSERT INTO g_v_part1
+                (exam_id, question, correct_answer, opt1, opt2, opt3)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                exam_id,
+                item['question'],
+                item['correct_answer'],
+                item['A'],
+                item['B'],
+                item['C']
+            ))
+        
+        # Xử lý part2
+        for group in json_data['part2']:
+            # Tạo mapping cho options
+            options = group['options']
+            option_map = {
+                'A': options.get('A', ''),
+                'B': options.get('B', ''),
+                'C': options.get('C', ''),
+                'D': options.get('D', ''),
+                'E': options.get('E', ''),
+                'F': options.get('F', ''),
+                'G': options.get('G', ''),
+                'H': options.get('H', ''),
+                'I': options.get('I', ''),
+                'K': options.get('K', '')
+            }
+            
+            for question in group['questions']:
+                cur.execute("""
+                    INSERT INTO g_v_part2 
+                    (exam_id, group_id, topic, question, correct_answer,
+                     opt1, opt2, opt3, opt4, opt5, 
+                     opt6, opt7, opt8, opt9, opt10)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    exam_id,
+                    int(group['group']),  # Chuyển thành integer
+                    group['topic'],
+                    question['question'],
+                    question['correct_answer'],
+                    option_map['A'],
+                    option_map['B'],
+                    option_map['C'],
+                    option_map['D'],
+                    option_map['E'],
+                    option_map['F'],
+                    option_map['G'],
+                    option_map['H'],
+                    option_map['I'],
+                    option_map['K']
+                ))
+        
+        conn.commit()
+        print(f"✅ Đã nhập thành công dữ liệu cho exam_id {exam_id}")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Lỗi: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+        
+
+async def create_g_v_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_set_id: int,
+    exam_part_code: str,
+    descriptions: str, # Tiêu đề chung cho phần Reading này
+    time_limit_for_part: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+    created_by_user_id: int,
+    original_file_path: Optional[str] = None # Đường dẫn đến file gốc đã lưu (nếu có)
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    with conn.cursor() as cur_validate:
+        cur_validate.execute("SELECT id FROM exam_sets WHERE id = %s", (exam_set_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"ExamSet with ID {exam_set_id} not found.")
+        cur_validate.execute(
+            "SELECT id FROM exams WHERE exam_code = %s AND examset_id = %s AND exam_type = %s ", (exam_part_code, exam_set_id, 'g_v')
+        ) 
+        if cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Speaking exam part with code '{exam_part_code}' already exists in ExamSet ID {exam_set_id}.")
+
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO Exams (examset_id, exam_code, exam_type, description,  time_limit, created_by_user_id, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_set_id, exam_part_code, "g_v", descriptions, 
+                time_limit_for_part, created_by_user_id, True) 
+        )
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create exam record in database.")
+        
+        exam_id = exam_record['id']
+        print(f"Created Exam (GV Part) record with ID: {exam_id} for ExamSet ID: {exam_set_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{GV_FILES_DIR}/{excel_file.filename}"
+    print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        g_v_json_data = aptis_g_v_to_json(saved_excel_file_path_str)
+        
+        insert_g_v_exam(g_v_json_data, exam_id)
+        print(f"Successfully committed all parts from Excel for exam_id {exam_id}")
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+                
+                
+                
+async def update_g_v_exam_from_excel( # Đổi tên từ _from_excel hoặc _from_pdf
+    exam_id: int,
+    excel_file: Optional[UploadFile], # Đây là JSON đầy đủ {"part1": ..., "part2": ...}
+) -> dict:
+    conn = None
+
+    conn = get_db_connection() 
+    # --- VALIDATE EXAM SET AND EXAM PART CODE (như cũ) ---
+    
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur_validate:
+        cur_validate.execute("SELECT id FROM exams WHERE id = %s", (exam_id,))
+        if not cur_validate.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exam with ID {exam_id} not found.")
+    
+    # --- Bắt đầu transaction chính ---
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(
+            """
+            UPDATE Exams SET updated_at = now()
+            WHERE id = %s
+            RETURNING id, examset_id, exam_code, exam_type, description, time_limit, is_active;
+            """,
+            (exam_id,) 
+        )
+   
+        exam_record = cur.fetchone()
+        if not exam_record:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update exam record in database.")
+        
+        exam_id = exam_record['id']
+        examset_id = exam_record['examset_id']
+        print(f"UPDATE Exam (Writing Part) record with ID: {exam_id} for Exam ID: {examset_id}")
+        conn.commit()
+    if not excel_file.filename or not excel_file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only Excel files (.xlsx, .xls) allowed.")
+    saved_excel_file_path_str =  f"{WRITING_FILE_DIR}/{excel_file.filename}"
+    try:
+        # ĐỌC NỘI DUNG FILE UPLOAD VÀ GHI
+        file_content = await excel_file.read() # <<<< SỬA Ở ĐÂY: await read()
+        with open(saved_excel_file_path_str, "wb") as file_object: # Mở ở chế độ "wb" (write bytes)
+            file_object.write(file_content) # Ghi nội dung bytes
+        print(f"Uploaded Excel file saved to: {saved_excel_file_path_str}")
+        print("📦 File exists:", os.path.exists(saved_excel_file_path_str))
+    except Exception as e_save:
+        # Nếu có lỗi khi lưu, xóa file nếu nó đã được tạo một phần (hiếm)
+        if os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded Excel file: {e_save}")
+    finally:
+        await excel_file.close() # Luôn đóng file upload
+    try:
+        g_v_json_data = aptis_g_v_to_json(saved_excel_file_path_str)
+        
+        update_exam_by_id(exam_id, g_v_json_data)
+        return exam_record
+    except HTTPException as http_exc: 
+        if conn: conn.rollback() 
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        raise http_exc 
+    except psycopg2.Error as db_err:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Database error during exam creation from Excel: {db_err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error (Excel): {str(db_err)}")
+    except ValueError as val_err: 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Excel parsing error: {val_err}")
+        # delete_exam_data(exam_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error parsing Excel file: {str(val_err)}")
+    except Exception as e:
+        if conn: conn.rollback()
+        # delete_exam_data(exam_id)
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            os.remove(saved_excel_file_path_str)
+        print(f"Unexpected error during exam creation from Excel: {type(e).__name__} - {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred (Excel): {str(e)}")
+    finally:
+        if conn: conn.close()
+        if excel_file: 
+            try:
+                await excel_file.close()
+            except Exception: pass 
+        if saved_excel_file_path_str and os.path.exists(saved_excel_file_path_str):
+            try:
+                os.remove(saved_excel_file_path_str)
+            except Exception as e_remove:
+                print(f"Error removing temp Excel file {saved_excel_file_path_str}: {e_remove}")
+                
+                
+                
+def get_gv_exam_by_id(exam_id):
+    # Kết nối database
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    result = {"part1": [], "part2": []}
+    
+    try:
+        # Lấy dữ liệu part1
+        cur.execute("""
+            SELECT question, correct_answer, opt1, opt2, opt3 
+            FROM g_v_part1
+            WHERE exam_id = %s
+        """, (exam_id,))
+        
+        for row in cur.fetchall():
+            print(row)
+            result["part1"].append({
+                "question": row["question"],
+                "correct_answer": row["correct_answer"],
+                "A": row["opt1"],
+                "B": row["opt2"],
+                "C": row["opt3"]
+            })
+        
+        # Lấy dữ liệu part2
+        # Bước 1: Lấy danh sách các group
+        cur.execute("""
+            SELECT DISTINCT group_id, topic 
+            FROM g_v_part2
+            WHERE exam_id = %s
+            ORDER BY group_id
+        """, (exam_id,))
+        
+        groups = []
+        for row in cur.fetchall():
+            groups.append({
+                "group": row["group_id"],
+                "topic": row["topic"],
+                "questions": []
+            })
+        
+        # Bước 2: Lấy options cho từng group (lấy từ bất kỳ bản ghi nào trong group)
+        for group in groups:
+            cur.execute("""
+                SELECT opt1, opt2, opt3, opt4, opt5, 
+                       opt6, opt7, opt8, opt9, opt10
+                FROM g_v_part2
+                WHERE exam_id = %s AND group_id = %s
+                LIMIT 1
+            """, (exam_id, group["group"]))
+            
+            options_row = cur.fetchone()
+            if options_row:
+                group["options"] = {
+                    "A": options_row["opt1"],
+                    "B": options_row["opt2"],
+                    "C": options_row["opt3"],
+                    "D": options_row["opt4"],
+                    "E": options_row["opt5"],
+                    "F": options_row["opt6"],
+                    "G": options_row["opt7"],
+                    "H": options_row["opt8"],
+                    "I": options_row["opt9"],
+                    "K": options_row["opt10"]
+                }
+            else:
+                group["options"] = {}
+        
+        # Bước 3: Lấy câu hỏi cho từng group
+        for group in groups:
+            cur.execute("""
+                SELECT question, correct_answer
+                FROM g_v_part2
+                WHERE exam_id = %s AND group_id = %s
+                ORDER BY id
+            """, (exam_id, group["group"]))
+            
+            for row in cur.fetchall():
+                
+                group["questions"].append({
+                    "question": row["question"],
+                    "correct_answer": row["correct_answer"]
+                })
+        
+        result["part2"] = groups
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy dữ liệu: {str(e)}")
+        raise e
+    finally:
+        cur.close()
+        conn.close()

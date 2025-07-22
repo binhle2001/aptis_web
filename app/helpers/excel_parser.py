@@ -394,6 +394,86 @@ def aptis_writing_to_json(file_path: str) -> str:
         print(f"Đã xảy ra lỗi không xác định: {e}")
         return []
 
+def aptis_g_v_to_json(file_path):
+    wb = load_workbook(file_path)
+    
+    # Process part1
+    ws_part1 = wb['part1']
+    part1_data = []
+    headers_part1 = [cell.value for cell in ws_part1[1]]
+    
+    for row in ws_part1.iter_rows(min_row=2, values_only=True):
+        if not row[0]:  # Skip empty rows
+            continue
+        
+        # Map correct answer letter to actual content
+        answer_map = {'A': row[2], 'B': row[3], 'C': row[4]}
+        correct_content = answer_map.get(row[1], '')
+        
+        item = {
+            "question": row[0],
+            "A": row[2],
+            "B": row[3],
+            "C": row[4],
+            "correct_answer": correct_content
+        }
+        part1_data.append(item)
+    
+    # Process part2
+    ws_part2 = wb['part2']
+    part2_data = []
+    current_group = None
+    current_options = None
+    
+    # Get headers for options (columns E to N)
+    option_headers = [cell.value for cell in ws_part2[1][4:14]]
+    
+    for row_idx in range(2, ws_part2.max_row + 1):
+        row = [cell.value for cell in ws_part2[row_idx]]
+        
+        # Skip empty rows
+        if not any(row):
+            continue
+        
+        group_val = row[0]
+        topic_val = row[1]
+        question_val = row[2]
+        correct_val = row[3]
+        
+        # Process group headers
+        if group_val:
+            # Save previous group
+            if current_group:
+                part2_data.append(current_group)
+            
+            # Get full options from first row of group
+            options = {}
+            for col_idx, header in enumerate(option_headers, start=4):
+                if col_idx < len(row):
+                    options[header] = row[col_idx] or ""
+            
+            current_options = options
+            
+            # Start new group
+            current_group = {
+                "group": group_val,
+                "topic": topic_val,
+                "options": current_options,
+                "questions": []
+            }
+        
+        # Add question to current group
+        if current_group and question_val:
+            current_group["questions"].append({
+                "question": question_val,
+                "correct_answer": correct_val
+            })
+    
+    # Add last group
+    if current_group:
+        part2_data.append(current_group)
+    
+    return {"part1": part1_data, "part2": part2_data}
 
 if __name__ == "__main__":
     json_data = aptis_speaking_to_json("C:/Users/admin/Desktop/aptis_web/Aptis_Speaking_Test_01.xlsx")
