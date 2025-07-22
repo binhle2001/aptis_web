@@ -155,10 +155,12 @@ def authenticate_gmail():
 
 def send_email_with_attachment(service, sender, recipient, subject, body_text, file_path):
     message = EmailMessage()
-    message.set_content(body_text)
     message['To'] = recipient
     message['From'] = sender
     message['Subject'] = subject
+
+    # Set nội dung HTML cho email
+    message.add_alternative(body_text, subtype='html')
 
     with open(file_path, 'rb') as f:
         file_data = f.read()
@@ -171,5 +173,4 @@ def send_email_with_attachment(service, sender, recipient, subject, body_text, f
     send_message = service.users().messages().send(userId="me", body=create_message).execute()
     print(f'Message Id: {send_message["id"]}')
     return send_message
-
 
