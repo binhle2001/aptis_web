@@ -2,9 +2,11 @@
 
 import base64
 import os
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from services.auth_service import get_db_connection
 from helpers.common import get_env_var
 from core.deps import get_current_member_user
 from services import commitment_service
@@ -13,7 +15,7 @@ from schemas.user_schema import CommitmentSchema
 router = APIRouter(
     prefix="/api/commitment",
     tags=["USER COMMITMENT - COMMITMENT Management"],
-    # dependencies=[Depends(get_current_member_user)], # Áp dụng cho tất cả các route trong router này
+    dependencies=[Depends(get_current_member_user)], # Áp dụng cho tất cả các route trong router này
     responses={
         401: {"description": "Not authenticated"},
         403: {"description": "Operation not permitted"},
@@ -50,7 +52,7 @@ async def generate_commitment_endpoint(data: CommitmentSchema):
         
         
 @router.post("/send_commitment_email")
-def send_commitment(data: CommitmentSchema):
+def send_commitment(data: CommitmentSchema, current_user: Annotated[dict, Depends(get_current_member_user)] = None):
     output_filename = f"/app/raw_file/commitments/commitment_{data.email.replace('.', '_')}.jpg"
 
     # Kiểm tra file có tồn tại không
@@ -70,6 +72,12 @@ def send_commitment(data: CommitmentSchema):
             body_text=body,
             file_path=output_filename
         )
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_commited = true WHERE id = %s", (current_user['id'], ))
+        conn.commit()
+        cursor.close()
+        conn.close()
         return {"message": "Email sent successfully"}
     except Exception as e:
-        return {"error": str(e)}
+        raise e

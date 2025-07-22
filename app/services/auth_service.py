@@ -52,7 +52,7 @@ async def login_for_access_token(form_data: UserLoginSchema):
         with conn.cursor() as cur:
             # 1. Lấy thông tin user
             cur.execute("""
-                SELECT id, username, password_hash, role, fullname, is_active, deviceid1, deviceid2
+                SELECT id, username, password_hash, role, fullname, is_active, deviceid1, deviceid2, is_commited
                 FROM users
                 WHERE LOWER(username) = LOWER(%s);
             """, (form_data.username,))

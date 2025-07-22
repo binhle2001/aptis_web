@@ -100,11 +100,15 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
         try:
             base64_string = data.signature_base64.split(',')[-1]
             signature_bytes = base64.b64decode(base64_string)
-            student_sig_img = Image.open(io.BytesIO(signature_bytes))
-            student_sig_img.thumbnail((325, 150)) # Resize chữ ký
+            student_sig_img = Image.open(io.BytesIO(signature_bytes)).convert("RGBA")
+            student_sig_img.thumbnail((150, 325))
 
-            # Dán ảnh chữ ký lên template
-            image.paste(student_sig_img, COORDINATES['student_signature_paste'], mask=student_sig_img)
+            # Kiểm tra nếu có alpha channel
+            if student_sig_img.mode == 'RGBA':
+                alpha = student_sig_img.split()[-1]
+                image.paste(student_sig_img, COORDINATES['student_signature_paste'], mask=alpha)
+            else:
+                image.paste(student_sig_img, COORDINATES['student_signature_paste'])
 
             # Ghi tên học viên dưới chữ ký (dùng anchor="mt" để tự động canh giữa)
             draw.text(COORDINATES['student_name_signature'], data.student_name, font=font_data_bold, fill=black_color, anchor="mt")
