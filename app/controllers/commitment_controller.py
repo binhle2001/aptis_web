@@ -61,8 +61,8 @@ def send_commitment(data: CommitmentSchema, current_user: Annotated[dict, Depend
 
     try:
         service = commitment_service.authenticate_gmail()
-        subject = "Bản cam kết đầu ra khóa học Aptis - Aptis One"
-        body = f"Kính gửi bạn {data.student_name}, Trung tâm AptisOne xin gửi bạn bản cam kết đầu ra của khóa học. Chúc bạn đạt được đầu ra mong muốn."
+        subject = "[APTIS ONE] Cam Kết Đầu Ra – Thi Một Lần Là Đạt!"
+        body = f"Kính chào {data.student_name},\nCảm ơn bạn đã tin tưởng lựa chọn APTIS ONE là người bạn đồng hành trên hành trình nâng cao trình độ tiếng Anh và chinh phục kỳ thi APTIS!\nVới phương châm “Thi một lần là đạt”, chúng tôi xin gửi đến bạn bản cam kết đầu ra và đồng hành từ APTIS ONE. Đây không chỉ là lời hứa về chất lượng giảng dạy, mà còn là sự đảm bảo rằng bạn luôn có người kề vai sát cánh trong suốt quá trình học tập và ôn luyện để đạt được mục tiêu của mình."
 
         commitment_service.send_email_with_attachment(
             service=service,
