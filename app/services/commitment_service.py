@@ -65,8 +65,8 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
         'fee_deadline': (1165, 1146),
         'commitment_output': (870, 1246),
         'student_name_inline': (630, 3846), # Vị trí chèn tên vào đoạn văn
-        'student_signature_paste': (1300, 4430), # Tọa độ dán chữ ký BÊN B
-        'student_name_signature': (1387, 4557),   # Tọa độ viết tên BÊN B
+        'student_signature_paste': (1320, 4430), # Tọa độ dán chữ ký BÊN B
+        'student_name_signature': (1435, 4557),   # Tọa độ viết tên BÊN B
     }
 
     # --- Điền thông tin văn bản lên ảnh ---
@@ -101,7 +101,7 @@ def generate_filled_commitment(data: CommitmentSchema, template_path: str = "com
             base64_string = data.signature_base64.split(',')[-1]
             signature_bytes = base64.b64decode(base64_string)
             student_sig_img = Image.open(io.BytesIO(signature_bytes)).convert("RGBA")
-            student_sig_img.thumbnail((150, 325))
+            student_sig_img.thumbnail((300, 325))
 
             # Kiểm tra nếu có alpha channel
             if student_sig_img.mode == 'RGBA':
