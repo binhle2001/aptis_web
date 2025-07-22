@@ -10,3 +10,4 @@ test.py
 test2.py
 app/credentials.json
 app/token.json
+.env
