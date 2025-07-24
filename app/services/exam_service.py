@@ -2448,7 +2448,6 @@ def get_gv_exam_by_id(exam_id):
         """, (exam_id,))
         
         for row in cur.fetchall():
-            print(row)
             result["part1"].append({
                 "question": row["question"],
                 "correct_answer": row["correct_answer"],
