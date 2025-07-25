@@ -20,6 +20,10 @@ alter_table_queries = [
     ALTER TABLE exam_sets
     ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT true;
     """,
+    """
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS exam_set_id_alarm INTEGER;
+    """,
     
 ]
 

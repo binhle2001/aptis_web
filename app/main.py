@@ -1,5 +1,8 @@
+from datetime import datetime
 from fastapi import FastAPI
 
+from services.user_service import alarm_user_with_email
+from helpers.common import get_env_var
 from helpers.middlewares import catch_exceptions_middleware
 from controllers import auth_controller, admin_controller, member_controller, guest_controller, commitment_controller # Import admin_controller
 # Import các routers khác nếu có
@@ -7,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -64,6 +68,14 @@ def setup_scheduler():
     scheduler.add_job(create_instruction_audio, trigger, id='daily_create_instruction')
     scheduler.add_job(download_all_images, trigger, id='daily_download_image')
     scheduler.add_job(cleanup_orphaned_files, trigger, id='cleanup_orphaned_files')
+    start_date_str = get_env_var('REMIND', 'START_DATE')  # '2025/7/26 12:00:00'
+    start_date = datetime.strptime(start_date_str, "%Y/%m/%d %H:%M:%S")
+    two_day_trigger = IntervalTrigger(
+        days=2,
+        start_date=start_date,
+        timezone="Asia/Bangkok"
+    )
+    scheduler.add_job(alarm_user_with_email, two_day_trigger, id='every_2_days_at_noon')
     scheduler.start()
     return scheduler
 

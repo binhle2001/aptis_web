@@ -81,7 +81,7 @@ def send_commitment(data: CommitmentSchema, current_user: Annotated[dict, Depend
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET is_commited = true WHERE id = %s", (current_user['id'], ))
+        cursor.execute("UPDATE users SET is_commited = true, email = %s WHERE id = %s", (data.email, current_user['id'], ))
         conn.commit()
         cursor.close()
         conn.close()

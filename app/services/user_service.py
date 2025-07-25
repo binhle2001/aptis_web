@@ -1,12 +1,17 @@
+import base64
+from email.message import EmailMessage
 import io
 import json
 import os
+import pickle
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import HTTPException, status
-
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from PIL import Image
-
+from googleapiclient.discovery import build
+from helpers.common import get_env_var
 from schemas.user_schema import UserCreateSchema, UserResponseSchema, UserUpdatePasswordSchema
 from core.security import get_password_hash
 from services.auth_service import get_db_connection # Tái sử dụng
@@ -532,6 +537,60 @@ async def delete_user_by_admin(user_id: int, admin_username: str) -> bool:
     finally:
         if conn:
             conn.close()
-            
+ 
+ 
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+           
+def authenticate_gmail():
+    creds = None
+    TOKEN_PATH = "token.json"
+    CREDENTIALS_PATH = "credentials.json"
+    if os.path.exists(TOKEN_PATH):
+        with open(TOKEN_PATH, 'rb') as token:
+            creds = pickle.load(token)
 
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_PATH, 'wb') as token:
+            pickle.dump(creds, token)
 
+    return build('gmail', 'v1', credentials=creds)           
+
+def alarm_user_with_email():
+    conn = get_db_connection()
+    service = authenticate_gmail()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, email, exam_set_id_alarm FROM users WHERE is_commited = true AND email IS NOT NULL;")
+    rows = cursor.fetchall()
+    for r in rows:
+        exam_set_id = r["exam_set_id_alarm"] if r["exam_set_id_alarm"] is not None else 0
+        cursor.execute("SELECT id, set_code, title from exam_sets WHERE id > %s ORDER BY id LIMIT 1", (exam_set_id,))
+        row = cursor.fetchone()
+        if row:
+            message = EmailMessage()
+            exam_set_id = row['id']
+            subject = f'Hoàn thành mã đề {row["title"]}  với Aptis One nhé!'
+            message['To'] = r['email']
+            message['From'] = get_env_var('GMAIL', 'SENDER_EMAIL')
+            message['Subject'] = subject
+            body_text = f"""<p>Chào bạn,</p>
+<p>Dạo này, cuộc sống ổn không Ní? 😊 Mình gửi lời nhắc NHẸ NHÀNG rằng bài kiểm tra Aptis mã đề {row["title"]} của bạn có thể vẫn đang chờ được hoàn thành trong hệ thống. Cố gắng hoàn thành bài sớm nhất có thể nhé.
+⏰ Hạn chót hoàn thành: trong vòng 24 giờ tới.</p>
+<p>Nếu cần hỗ trợ gì, bạn cứ nhắn tin cho Zalo của Aptis One (0862751016) bất cứ lúc nào.</p>
+<p>Chúc bạn học tốt và làm bài thật tự tin!</p>
+<p>Thân mến,</p>
+<p>Aptis One Team.</p>"""
+            # Set nội dung HTML cho email
+            message.add_alternative(body_text, subtype='html')
+            encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            create_message = {'raw': encoded_message}
+            send_message = service.users().messages().send(userId="me", body=create_message).execute()
+            cursor.execute("UPDATE users SET exam_set_id_alarm = %s WHERE id = %s;", (exam_set_id, r['id']))
+            conn.commit()
+        
+    
+        
