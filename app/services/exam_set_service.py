@@ -90,7 +90,7 @@ async def get_exam_set(
             data_sql = f"""
                 SELECT 
                   id, set_code, title, description, created_by_user_id,
-                  is_active, created_at, updated_at
+                  is_active, created_at, updated_at, is_locked
                 FROM exam_sets
                 {where_sql}
                 LIMIT %s OFFSET %s;
@@ -99,19 +99,14 @@ async def get_exam_set(
             
             cur.execute(data_sql, params + [limit, offset])
             rows = cur.fetchall()
-
+            
             # 5) Chuyển thành list of dict và isoformat cho timestamp
             items = []
-            if current_role_user == "guest":
-                r = rows[0]
-                item = dict(r)
-                return {
-                "items": [item],
-                "total": 1,
-                "total_pages": 1,
-            }
+            
             for r in rows:
+                
                 item = dict(r)
+                print(item)
                 item["created_at"] = item["created_at"].isoformat()
                 item["updated_at"] = item["updated_at"].isoformat()
                 items.append(item)

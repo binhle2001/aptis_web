@@ -35,7 +35,9 @@ class ExamSetResponseSchema(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    is_locked: bool
     exams: List[ExamBriefSchema] = []
+    
 
     class Config:
         json_schema_extra = {
@@ -48,6 +50,7 @@ class ExamSetResponseSchema(BaseModel):
                 "is_active": True,
                 "created_at": "2025-06-15T09:00:00",
                 "updated_at": "2025-06-15T09:00:00",
+                "is_locked": True, 
                 "exams": [
                     {
                         "id": 10,
