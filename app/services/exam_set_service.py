@@ -106,7 +106,6 @@ async def get_exam_set(
             for r in rows:
                 
                 item = dict(r)
-                print(item)
                 item["created_at"] = item["created_at"].isoformat()
                 item["updated_at"] = item["updated_at"].isoformat()
                 items.append(item)
@@ -137,7 +136,7 @@ async def get_exam_set_by_id(exam_set_id: int, current_user) -> dict:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # --- Bước 1: Lấy thông tin cơ bản của exam_set (chung cho mọi vai trò) ---
             cur.execute("""
-                SELECT id, set_code, title, description
+                SELECT id, set_code, title, description, is_locked
                 FROM exam_sets
                 WHERE id = %s AND is_active = TRUE
             """, (exam_set_id,))
@@ -145,9 +144,12 @@ async def get_exam_set_by_id(exam_set_id: int, current_user) -> dict:
             exam_set_data = cur.fetchone()
             if not exam_set_data:
                 raise HTTPException(status_code=404, detail=f"Exam set with id {exam_set_id} not found.")
+            role = current_user.get("role")
+            if role == "guest" and exam_set_data["is_locked"]:
+                raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
             # --- Bước 2: Phân luồng xử lý dựa trên vai trò của người dùng ---
-            role = current_user.get("role")
+            
             
             if role in ["admin", "guest"]:
                 # === Luồng cho Admin/Teacher: Lấy dữ liệu tổng hợp ===

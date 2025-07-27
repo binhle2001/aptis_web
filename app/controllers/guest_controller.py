@@ -39,13 +39,13 @@ async def list_exam_sets_endpoint(
     data = await exam_set_service.get_exam_set(search=search, page=page, limit=limit, current_role_user = current_user.get("role"))
     return ExamSetListResponseSchema(**data)
 
-@router.get("/exam-sets/{exam_set_id}", response_model=ExamSetResponseSchema)
+@router.get("/exam-sets/{exam_set_id}")
 async def get_exam_set_endpoint(
     exam_set_id: int,
     current_user: Annotated[dict, Depends(get_current_member_user)]
 ):
     exam_set = await exam_set_service.get_exam_set_by_id(exam_set_id, current_user)
-    return ExamSetResponseSchema(**exam_set)
+    return exam_set
 
 @router.get("/exam/{exam__id}")
 async def get_exam_set_endpoint(
@@ -55,7 +55,7 @@ async def get_exam_set_endpoint(
     """
     Lấy ra nội dung đề thi thử
     """
-    exam_set = exam_service.get_exam_by_id(exam__id)
+    exam_set = exam_service.get_exam_by_id(exam__id, current_user)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
 @router.post("/exam-file")

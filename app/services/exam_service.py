@@ -503,14 +503,22 @@ def get_reading_exam_by_id(exam_id):
     
     return result
 
-def get_exam_by_id(exam_id):
+def get_exam_by_id(exam_id, current_user):
     try:
         conn = get_db_connection() 
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute("SELECT id, exam_type from exams WHERE id = %s", (exam_id,))
+        cur.execute("SELECT id, exam_type, examset_id from exams WHERE id = %s", (exam_id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exam id {exam_id} not found")
+        examset_id = row["examset_id"]
+        role = current_user.get('role')
+        if role == "guest":
+            cur_set = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur_set.execute("SELECT id FROM exam_sets WHERE is_locked = false AND id = %s", (examset_id, ))
+            row_set = cur_set.fetchone()
+            if not row_set:
+                raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
         exam_type = row["exam_type"]
         if exam_type == "reading":
             return get_reading_exam_by_id(exam_id)
