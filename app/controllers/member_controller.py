@@ -63,7 +63,7 @@ async def get_exam_set_endpoint(
     """
     Lấy nội dung đề
     """
-    exam_set = exam_service.get_exam_by_id(exam__id)
+    exam_set = exam_service.get_exam_by_id(exam__id, current_admin)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
 @router.post("/exam-file")

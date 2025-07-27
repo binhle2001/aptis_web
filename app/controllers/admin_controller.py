@@ -337,7 +337,7 @@ async def get_exam_set_endpoint(
     exam__id: int,
     current_admin: Annotated[dict, Depends(get_current_admin_user)]
 ):
-    exam_set = exam_service.get_exam_by_id(exam__id)
+    exam_set = exam_service.get_exam_by_id(exam__id, current_admin)
     return JSONResponse(status_code=status.HTTP_200_OK, content = exam_set)
 
 @router.patch("/exam/reading/{exam_id}")
