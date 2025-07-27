@@ -109,7 +109,7 @@ async def get_exam_set(
                 item["created_at"] = item["created_at"].isoformat()
                 item["updated_at"] = item["updated_at"].isoformat()
                 items.append(item)
-
+            items = sorted(items, key=lambda x: x['is_locked'])
             return {
                 "items": items,
                 "total": total,
