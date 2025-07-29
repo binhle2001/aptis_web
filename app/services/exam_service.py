@@ -38,7 +38,7 @@ def insert_reading_part1_json(json_data, exam_id):
     :param db_config: dict chứa thông tin kết nối DB (dbname, user, password, host, port)
     """
     insert_query = """
-        INSERT INTO reading_part_1 (exam_id, group_id, question, correct_answer, option1, option2, option3)
+        INSERT INTO reading_part_1 (exam_id, group_id, question, correct_answer, option1, option2, option3, explain)
         VALUES %s
     """
     conn = get_db_connection()
@@ -48,6 +48,7 @@ def insert_reading_part1_json(json_data, exam_id):
         for q in group["questions"]:
             question = q["sentence"]
             correct_answer = q["correct_answer"]
+            explain = q["explain"]
             # Đảm bảo có đủ 3 lựa chọn, nếu thiếu thì thêm chuỗi rỗng
             options = q["options"] + [""] * (3 - len(q["options"]))
             values.append((
@@ -57,7 +58,8 @@ def insert_reading_part1_json(json_data, exam_id):
                 correct_answer,
                 options[0],
                 options[1],
-                options[2]
+                options[2],
+                explain
             ))
 
     try:
@@ -67,7 +69,7 @@ def insert_reading_part1_json(json_data, exam_id):
         conn.commit()
         cursor.close()
         conn.close()
-        print("✅ Dữ liệu Part 4 đã được chèn thành công.")
+        print("✅ Dữ liệu Part 1 đã được chèn thành công.")
     except Exception as e:
         print("Lỗi khi chèn dữ liệu:", e)
         
@@ -81,7 +83,7 @@ def insert_reading_part2_json(json_data, exam_id):
     """
     insert_query = """
         INSERT INTO reading_part_2 (
-            exam_id, group_id, topic, sentence_text, sentence_key, is_example_first
+            exam_id, group_id, topic, sentence_text, sentence_key, is_example_first, explain
         )
         VALUES %s
     """
@@ -96,7 +98,8 @@ def insert_reading_part2_json(json_data, exam_id):
                 topic,
                 sentence["text"],
                 int(sentence["key"]),
-                sentence["is_example_first"]
+                sentence["is_example_first"],
+                group["explain"]
             ))
 
     try:
@@ -122,7 +125,7 @@ def insert_reading_part3_json(json_data, exam_id):
     insert_query = """
         INSERT INTO reading_part_3 (
             exam_id, group_id, topic, question_text, correct_answer,
-            person_a, person_b, person_c, person_d
+            person_a, person_b, person_c, person_d, explain
         )
         VALUES %s
     """
@@ -150,6 +153,7 @@ def insert_reading_part3_json(json_data, exam_id):
         for q in group["questions"]:
             question_text = q["text"]
             correct_person = q["correct_answer"].strip()
+            explain = q["explain"]
             correct_answer = person_map.get(correct_person, "?")  # fallback ?
 
             values.append((
@@ -161,7 +165,8 @@ def insert_reading_part3_json(json_data, exam_id):
                 person_a,
                 person_b,
                 person_c,
-                person_d
+                person_d,
+                explain
             ))
 
     try:
@@ -189,7 +194,7 @@ def insert_reading_part4_json(json_data, exam_id):
         INSERT INTO reading_part_4 (
             exam_id, topic, paragraph, correct_answer,
             option1, option2, option3, option4,
-            option5, option6, option7, option8
+            option5, option6, option7, option8, explain
         )
         VALUES %s
     """
@@ -208,6 +213,7 @@ def insert_reading_part4_json(json_data, exam_id):
         for q in group["questions"]:
             paragraph = q["text"]
             correct_answer_index = q["correct_answer"]
+            explain = q["explain"]
             correct_answer_letter = index_to_letter(correct_answer_index)
 
             values.append((
@@ -215,7 +221,8 @@ def insert_reading_part4_json(json_data, exam_id):
                 topic,
                 paragraph,
                 correct_answer_letter,
-                *padded_options
+                *padded_options,
+                explain
             ))
 
     try:
@@ -400,7 +407,7 @@ def get_reading_exam_by_id(exam_id):
     # ===== Part 1 =====
     # note: column is named "question", not "question_text", and only 3 options
     cur.execute("""
-        SELECT group_id, question, option1, option2, option3, correct_answer
+        SELECT group_id, question, option1, option2, option3, correct_answer, explain
             FROM reading_part_1
             WHERE exam_id = %s
             ORDER BY group_id, question_id
@@ -413,6 +420,7 @@ def get_reading_exam_by_id(exam_id):
         part1_groups.setdefault(grp, []).append({
             "sentence": r["question"],
             "correct_answer": r["correct_answer"],
+            "explain": r["explain"],
             "options": [r["option1"], r["option2"], r["option3"]]
         })
     for grp, qs in sorted(part1_groups.items()):
@@ -423,7 +431,7 @@ def get_reading_exam_by_id(exam_id):
 
     # ===== Part 2 =====
     cur.execute("""
-        SELECT group_id, topic, sentence_text, sentence_key, is_example_first
+        SELECT group_id, topic, sentence_text, sentence_key, is_example_first, explain
             FROM reading_part_2
             WHERE exam_id = %s
             ORDER BY group_id
@@ -434,11 +442,12 @@ def get_reading_exam_by_id(exam_id):
         grp = float(r["group_id"])
         part2_groups.setdefault(grp, {
             "topic": r["topic"],
+            "explain": r["explain"],
             "sentences": []
         })["sentences"].append({
             "key": float(r["sentence_key"]),
             "text": r["sentence_text"],
-            "is_example_first": r["is_example_first"]
+            "is_example_first": r["is_example_first"],
         })
     for grp in sorted(part2_groups):
         result["part2"].append(part2_groups[grp])
@@ -447,7 +456,7 @@ def get_reading_exam_by_id(exam_id):
     cur.execute("""
         SELECT group_id, topic,
                 question_text, correct_answer,
-                person_a, person_b, person_c, person_d
+                person_a, person_b, person_c, person_d, explain
             FROM reading_part_3
             WHERE exam_id = %s
             ORDER BY group_id, question_id
@@ -465,7 +474,8 @@ def get_reading_exam_by_id(exam_id):
             "questions": []
         })["questions"].append({
             "text": r["question_text"],
-            "correct_answer": f"Person_{r['correct_answer']}"
+            "correct_answer": f"Person_{r['correct_answer']}",
+            "explain": r["explain"]
         })
     for grp in sorted(part3_groups):
         result["part3"].append(part3_groups[grp])
@@ -475,7 +485,7 @@ def get_reading_exam_by_id(exam_id):
         SELECT topic,
                 option1, option2, option3, option4,
                 option5, option6, option7, option8,
-                paragraph, correct_answer
+                paragraph, correct_answer, explain
             FROM reading_part_4
             WHERE exam_id = %s
             ORDER BY question_id
@@ -491,7 +501,8 @@ def get_reading_exam_by_id(exam_id):
             idx = ord(r["correct_answer"]) - ord('A')
             questions.append({
                 "text": r["paragraph"],
-                "correct_answer": idx
+                "correct_answer": idx,
+                "explain": r["explain"]
             })
         result["part4"].append({
             "topic": rows[0]["topic"],
@@ -593,6 +604,7 @@ def update_exam_by_id(exam_id, json_content):
             part3 = json_content["part3"]
             part4 = json_content["part4"]
             insert_listening_part1_json(part1, exam_id)
+            
             insert_listening_part2_json(part2, exam_id)
             insert_listening_part3_json(part3, exam_id)
             insert_listening_part4_json(part4, exam_id)  
@@ -746,23 +758,23 @@ def insert_listening_part1_json(json_data, exam_id):
         # 1) Insert tạm JSON vào DB (audio_path = link gốc)
         insert_sql = """
             INSERT INTO listening_part_1
-                (exam_id, question, audio_path, correct_answer, option1, option2, option3)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (exam_id, question, audio_path, correct_answer, option1, option2, option3, transcript, explain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
+        
         for item in json_data:
             q       = item['question']
             link    = item['audio_link']
             ans     = int(item['correct_answer'])
             opt1, opt2, opt3 = item['options']
+            transcript = item["transcript"]
+            
+            explain = item["explain"]
             cur.execute(insert_sql, (
-                exam_id, q, link, ans, opt1, opt2, opt3
+                exam_id, q, link, ans, opt1, opt2, opt3, transcript, explain
             ))
         conn.commit()
         
-
-
-        
-        conn.commit()
         return "success"
     
     except Exception as e:
@@ -785,11 +797,10 @@ def insert_listening_part2_json(json_data, exam_id):
         insert_sql = """
             INSERT INTO listening_part_2
               (exam_id, topic, audio_path, a, b, c, d,
-               option1, option2, option3, option4, option5, option6)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               option1, option2, option3, option4, option5, option6, transcript, explain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """
-        
         for item in json_data:
             
             topic = item['topic']
@@ -799,6 +810,9 @@ def insert_listening_part2_json(json_data, exam_id):
             b = int(item['b'])
             c = int(item['c'])
             d = int(item['d'])
+            transcript = item["transcript"]
+            explain = item["explain"]
+            
             opts = item.get('options', [])
             # unpack 6 options, nếu thiếu thì None
             o1,o2,o3,o4,o5,o6 = (opts + [None]*6)[:6]
@@ -806,7 +820,7 @@ def insert_listening_part2_json(json_data, exam_id):
             cur.execute(insert_sql, (
                 exam_id, topic, link,
                 a, b, c, d,
-                o1, o2, o3, o4, o5, o6
+                o1, o2, o3, o4, o5, o6, transcript, explain
             ))
         conn.commit()
         return "success"
@@ -830,25 +844,29 @@ def insert_listening_part3_json(json_data, exam_id):
         # 1) Insert tạm vào DB (audio_path = link gốc)
         insert_sql = """
             INSERT INTO listening_part_3
-              (exam_id, topic, question, correct_answer, audio_path)
-            VALUES (%s, %s, %s, %s, %s)
+              (exam_id, topic, question, correct_answer, audio_path, transcript, explain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
+        
         for item in json_data:
             topic = item.get('topic')
             link  = item.get('audio_link')
             questions = item.get('questions', [])
             answers   = item.get('correct_answers', [])
+            transcript = item.get("transcript")
+            explains = item.get("explains", [])
             # mỗi item chứa 4 câu liên tiếp
-            for q_text, ans in zip(questions, answers):
+            for q_text, ans, explain in zip(questions, answers, explains):
                 cur.execute(insert_sql, (
                     exam_id,
                     topic,
                     q_text,
                     ans,
-                    link
+                    link, 
+                    transcript,
+                    explain
                 ))
         conn.commit()
-
         return "success"
 
     except Exception as e:
@@ -870,8 +888,8 @@ def insert_listening_part4_json(json_data, exam_id):
         insert_sql = """
             INSERT INTO listening_part_4
               (exam_id, topic, question, correct_answer, audio_path,
-               option1, option2, option3)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               option1, option2, option3, transcript, explain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         for item in json_data:
             topic = item.get('topic')
@@ -879,9 +897,10 @@ def insert_listening_part4_json(json_data, exam_id):
             questions = item.get('questions', [])
             answers   = item.get('correct_answers', [])
             opts_list = item.get('options', [])
-
+            transcript = item.get("transcript")
+            explains = item.get('explains', [])
             # Mỗi item chứa n câu (ở ví dụ là 2)
-            for idx, (q_text, ans, opts) in enumerate(zip(questions, answers, opts_list), start=1):
+            for idx, (q_text, ans, opts, explain) in enumerate(zip(questions, answers, opts_list, explains), start=1):
                 o1,o2,o3 = (opts + [None]*3)[:3]
                 cur.execute(insert_sql, (
                     exam_id,
@@ -889,10 +908,11 @@ def insert_listening_part4_json(json_data, exam_id):
                     q_text,
                     int(ans),
                     link,
-                    o1, o2, o3
+                    o1, o2, o3,
+                    transcript,
+                    explain
                 ))
         conn.commit()
-        
         return "success"
 
     except Exception as e:
@@ -1120,7 +1140,9 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
             SELECT question,
                    audio_path  AS audio_link,
                    correct_answer,
-                   ARRAY[option1, option2, option3] AS options
+                   ARRAY[option1, option2, option3] AS options,
+                   transcript,
+                   explain
               FROM listening_part_1
              WHERE exam_id = %s
              ORDER BY id
@@ -1132,11 +1154,14 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
             SELECT topic,
                    audio_path  AS audio_link,
                    a, b, c, d,
-                   ARRAY[option1, option2, option3, option4, option5, option6] AS options
+                   ARRAY[option1, option2, option3, option4, option5, option6] AS options,
+                   transcript,
+                   explain
               FROM listening_part_2
              WHERE exam_id = %s
              ORDER BY id
         """, (exam_id,))
+        
         rows2 = cur.fetchall()
         part2 = []
         for r in rows2:
@@ -1148,15 +1173,19 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
                 "c":          r['c'],
                 "d":          r['d'],
                 "options":    r['options'],
+                "transcript": r["transcript"],
+                "explain":    r["explain"],
             })
         result['part2'] = part2
-
+       
         # --- Part 3: chỉ tạo 1 block cho mỗi audio_link
         cur.execute("""
             SELECT topic,
                    question,
                    correct_answer,
-                   audio_path AS audio_link
+                   audio_path AS audio_link,
+                   transcript,
+                   explain
               FROM listening_part_3
              WHERE exam_id = %s
              ORDER BY id
@@ -1169,20 +1198,23 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
             block3 = {
                 "topic":           first['topic'],
                 "audio_link":      first['audio_link'],
+                "transcript":      first["transcript"],
                 "questions":       [r['question']        for r in rows3],
-                "correct_answers": [r['correct_answer'].strip()  for r in rows3]
+                "correct_answers": [r['correct_answer'].strip()  for r in rows3],
+                "explains":        [r['explain'].strip()  for r in rows3]
             }
             result['part3'] = [block3]
         else:
             result['part3'] = []
-
+        
         # --- Part 4: gom theo audio_link nhưng giữ nhiều block nếu link khác nhau
         cur.execute("""
             SELECT topic,
                    question,
                    correct_answer,
                    audio_path  AS audio_link,
-                   option1, option2, option3
+                   option1, option2, option3,
+                   transcript, explain
               FROM listening_part_4
              WHERE exam_id = %s
              ORDER BY id
@@ -1192,6 +1224,7 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
         part4 = []
         seen4 = set()
         for row in rows4:
+            print(row)
             link = row['audio_link']
             if link not in seen4:
                 seen4.add(link)
@@ -1200,13 +1233,16 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
                     "audio_link":      link,
                     "questions":       [],
                     "correct_answers": [],
-                    "options":         []
+                    "options":         [],
+                    "transcript": row["transcript"],
+                    "explain": []
                 })
             # tìm block tương ứng
             blk = next(b for b in part4 if b['audio_link'] == link)
             blk['questions'].append(row['question'])
             blk['correct_answers'].append(row['correct_answer'])
             blk['options'].append([row['option1'], row['option2'], row['option3']])
+            blk['explain'].append(row['explain'])
         result['part4'] = part4
 
         return result
@@ -2534,3 +2570,7 @@ def get_gv_exam_by_id(exam_id):
     finally:
         cur.close()
         conn.close()
+        
+        
+def scoring_writing_exam_by_AI(exam_id, submission_data):
+    pass

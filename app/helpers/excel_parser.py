@@ -38,7 +38,8 @@ def aptis_reading_to_json(file_path):
             question = {
                 "sentence": row[1],
                 "correct_answer": row[2],
-                "options": [row[3], row[4], row[5]]
+                "options": [row[3], row[4], row[5]],
+                "explain": row[6]
             }
             current_group["questions"].append(question)
     
@@ -49,7 +50,8 @@ def aptis_reading_to_json(file_path):
         if row[0]:
             current_topic = {
                 "topic": row[0],
-                "sentences": []
+                "sentences": [],
+                "explain": row[4]
             }
             data["part2"].append(current_topic)
         
@@ -85,7 +87,8 @@ def aptis_reading_to_json(file_path):
         if row[1]:
             question = {
                 "text": row[1],
-                "correct_answer": row[2]
+                "correct_answer": row[2],
+                "explain": row[7]
             }
             current_topic["questions"].append(question)
     
@@ -102,10 +105,15 @@ def aptis_reading_to_json(file_path):
     for row in ws.iter_rows(min_row=2, min_col=4, max_col=4, values_only=True):
         if row[0] and row[0].strip():
             headers.append(row[0])
+            
+    explains = []
+    for row in ws.iter_rows(min_row=2, min_col=5, max_col=5, values_only=True):
+        if row[0] and row[0].strip():
+            explains.append(row[0])
     
     # Xử lý nội dung
     current_topic = None
-    for row in ws.iter_rows(min_row=2, max_col=3, values_only=True):
+    for i, row in enumerate(ws.iter_rows(min_row=2, max_col=3, values_only=True)):
         if row[0]:
             # Lưu topic trước đó nếu có
             if current_topic is not None:
@@ -125,10 +133,11 @@ def aptis_reading_to_json(file_path):
                 correct_id = int(float(row[2])) - 1 if row[2] else None
             except (TypeError, ValueError):
                 correct_id = None
-            
             question = {
                 "text": row[1],
-                "correct_answer": correct_id
+                "correct_answer": correct_id,
+                "explain": explains[i]
+                
             }
             current_topic["questions"].append(question)
     
@@ -154,7 +163,9 @@ def aptis_listening_to_json(file_path):
                     "question": row[0],
                     "audio_link": row[1],
                     "correct_answer": row[2],
-                    "options": [str(row[3]), str(row[4]), str(row[5])]
+                    "options": [str(row[3]), str(row[4]), str(row[5])],
+                    "transcript": row[6],
+                    "explain": row[7]
                 }
                 part1_data.append(item)
         result['part1'] = part1_data
@@ -175,7 +186,9 @@ def aptis_listening_to_json(file_path):
             "topic": row1[0],
             "audio_link": row1[1],
             "a": int(row1[2]) if isinstance(row1[2], float) else row1[2],
-            "options": options
+            "options": options,
+            "transcript": row1[9],
+            "explain": row1[10]
         }
         
         # Thêm các correct_answer từ các hàng tiếp theo
@@ -189,7 +202,6 @@ def aptis_listening_to_json(file_path):
                 if isinstance(value, float):
                     value = int(value)
                 part2_obj[letters[i]] = value
-        
         part2_data.append(part2_obj)
         result['part2'] = part2_data
     
@@ -211,13 +223,16 @@ def aptis_listening_to_json(file_path):
                     "topic": row[0],
                     "questions": [],
                     "correct_answers": [],
-                    "audio_link": row[3]
+                    "audio_link": row[3],
+                    "transcript": row[4],
+                    "explains": []
                 }
             
             # Thêm câu hỏi và câu trả lời vào group hiện tại
             if row[1]:
                 current_group["questions"].append(row[1])
                 current_group["correct_answers"].append(row[2])
+                current_group["explains"].append(row[5])
         
         # Lưu group cuối cùng
         if current_group:
@@ -244,13 +259,16 @@ def aptis_listening_to_json(file_path):
                     "audio_link": row[1],
                     "questions": [],
                     "correct_answers": [],
-                    "options": []
+                    "options": [],
+                    "transcript": row[7],
+                    "explains": []
                 }
             
             # Thêm câu hỏi, đáp án và lựa chọn vào group hiện tại
             if row[2]:
                 current_group["questions"].append(row[2])
                 current_group["correct_answers"].append(row[3])
+                current_group["explains"].append(row[8])
                 current_group["options"].append([
                     str(row[4]),
                     str(row[5]),
