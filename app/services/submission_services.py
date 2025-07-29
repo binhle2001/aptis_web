@@ -35,7 +35,7 @@ def put_exam_submission(user_id, exam_id, submission_data, score = None,):
         
     try:
         
-        answer_string = json.dumps(submission_data)
+        answer_string = json.dumps(submission_data, ensure_ascii = False)
         if score is not None:
             cursor.execute("""INSERT INTO exam_submission (user_id, exam_id, score, answer_string, is_scored) 
                            VALUES (%s, %s, %s, %s, %s) 
@@ -48,6 +48,7 @@ def put_exam_submission(user_id, exam_id, submission_data, score = None,):
                            (user_id, exam_id, answer_string))
         conn.commit()
         row = cursor.fetchone()
+        
         return {
             "id": row["id"],
             "user_id": row["user_id"],

@@ -11,6 +11,7 @@ import os
 from psycopg2.extras import execute_values
 import requests
 from ai_tools.EN.inference import speak_EN
+from helpers.ai_review import generate_writing_review
 from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
@@ -2572,5 +2573,46 @@ def get_gv_exam_by_id(exam_id):
         conn.close()
         
         
-def scoring_writing_exam_by_AI(exam_id, submission_data):
-    pass
+def scoring_writing_exam_by_AI():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM exams WHERE exam_type = %s;", ("writing",))
+    rows = cursor.fetchall()
+    
+    if not rows: 
+        return None
+    for row in rows:
+        exam_id = row["id"]
+        cursor.execute("SELECT id, exam_id, answer_string FROM exam_submission WHERE ai_reviewed = %s AND exam_id = %s AND is_scored = false;", (False, exam_id))
+        row = cursor.fetchone()
+        if not row:
+            continue
+        submission_id = row["id"]
+        
+        answer_string = json.loads(row["answer_string"])
+        use_answers = answer_string["userAnswers"]
+        writing_data = get_writing_exam_by_id(exam_id)
+        ai_reviews = {}
+        for part_id, part in enumerate(writing_data):
+            instruction = part["instruction"]
+            for question_id, question in enumerate(part["questions"]):
+                key_user = f"w_p{part_id+1}_q{question_id+1}"
+                user_answer = use_answers.get(key_user, None)
+                if user_answer is not None:
+                    ai_reviews[key_user] = generate_writing_review(instruction, question, user_answer)
+        answer_string["ai_review"] = ai_reviews
+        submission_data_string = json.dumps(answer_string, ensure_ascii=False)
+        cursor.execute("UPDATE exam_submission SET answer_string = %s, ai_reviewed = %s WHERE id = %s", (submission_data_string, True, submission_id))
+        conn.commit()
+        conn.close()
+        cursor.close()
+        return None
+    
+
+    
+    
+                
+        
+    
+    
+    

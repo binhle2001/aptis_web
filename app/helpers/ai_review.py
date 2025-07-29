@@ -25,53 +25,27 @@ MODEL = "gemini-2.5-flash"
 
 from google import genai
 from google.genai import types
-def generate():
-    client = genai.Client(
-        api_key="AIzaSyBnEnmMEJvtzI8yhz296TCq50xhYxBrQCA",
-    )
 
+from .common import get_env_var
+client = genai.Client(
+        api_key=get_env_var("GEMINI", "API_KEY"),
+    )
+def generate_writing_review(instruction, question, user_answer):
     model = "gemini-2.5-flash"
     contents = [
         types.Content(
             role="user",
             parts=[
-                types.Part.from_text(text="""ROLE:
-You are a precise and helpful Vietnamese English teacher for the Aptis Writing test. Your main goal is to correct student answers while respecting the test's constraints in a smart, flexible way. Your tone is always encouraging, clear, and supportive.
-TASK:
-You will analyze a student's answer to a short-form Aptis question. You must perform two actions in the exact order and format below, focusing on correction for naturalness and grammatical accuracy.
-INPUT:
-Instruction: The test's instruction, including the official word count limit (e.g., "Answer in 1-5 words").
-Question: The specific question asked.
-Student's Answer: The student's original, unedited response.
-OUTPUT FORMAT AND INSTRUCTIONS:
-1. Sửa lỗi và Viết lại câu trả lời (Corrected Answer):
-Your primary goal is to correct any grammatical or spelling errors in the Student's Answer.
-CRITICAL - WORD COUNT RULE: The Instruction will state an official word limit (e.g., 1-5 words). You should treat this as a guideline. You are allowed to write a slightly longer answer—up to approximately 1.5 times the maximum limit (e.g., for a 5-word limit, you can write up to 7 words)—IF AND ONLY IF this is necessary to form a grammatically complete and natural-sounding sentence (e.g., changing "blue" to "My favorite color is blue.").
-IMPORTANT: Even with this flexibility, DO NOT add new ideas, reasons, or complex details (like "because..."). The goal is grammatical completeness, not adding information.
-Correct capitalization (e.g., "i" -> "I", "nha trang" -> "Nha Trang").
-Ensure the result is a grammatically correct phrase or sentence that sounds fluent and natural.
-2. Nhận xét của giáo viên (Teacher's Feedback):
-Provide your feedback in Vietnamese.
-Your feedback must be concise, polite, encouraging, and written in full, simple sentences that are easy for a student to understand.
-IMPORTANT: Your comments must focus specifically on the student's original answer and the corrections you made.
-Explain what was corrected (e.g., lỗi chính tả, thiếu chủ ngữ, viết hoa) and why.
-If you made the answer longer to make it more complete, hãy giải thích ngắn gọn cho học sinh rằng: "Việc thêm vào chủ ngữ-vị ngữ như 'My favorite is...' sẽ giúp câu của em tự nhiên và hoàn chỉnh hơn."
-DO NOT comment on your Corrected Answer as if it were the student's work."""),
+                types.Part.from_text(text=WRITING_INSTRUCTION_PROMPT),
             ],
         ),
         types.Content(
             role="user",
             parts=[
-                types.Part.from_text(text="""'Instruction': You are a member of the Community club. You have received this email from the club:
-
-Dear Member,
-Our club need support with several tasks this year. First, we need more members who can actively participate in our ongoing projects. Second, we are looking for creative ideas to develop new acitivities. Could you share some suggesions with us to help support our projects this year?
-
-The President
-
-'Question': Write an email to the president of the club. Write about your feelings and what you think the club should do about the situation. Write 120–150 words. Recommended time: 20 minutes.
-'student's answer': "<p>Dear Manager,</p><p>I hope you are having a wonderful day. My full name is Tran Nguyen Thu Hong, and I have been a member of our club for six months. I am writing this email to share my feelings and suggestions about the news that I have received from the community club.</p><p>According to the news, the club needs more members who can actively participate in our ongoing projects. To be honest, I felt over the moon when I heard that news because the club will develop in the future. </p><p>From my perspective, I think we should consider the organization to attract many members to join the club. Besides, we should invite famous people to create a lot of activities for new members. However, </p><p>I hope my feelings will be useful. If it is convenient, I am looking forward to hearing from you soon!</p><p>Best regards,</p><p>Tran Nguyen Thu Hong.</p>
-                                     """),
+                types.Part.from_text(text=f"""'Instruction': {instruction}
+'Question': {question}
+'user_answer': {user_answer}
+"""),
             ],
         ),
     ]
@@ -82,4 +56,4 @@ The President
     )
 
     output = client.models.generate_content(model = model, contents=contents, config = generate_content_config)
-    print(output.text)
+    return output.text

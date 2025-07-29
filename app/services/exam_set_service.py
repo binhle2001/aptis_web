@@ -28,7 +28,7 @@ async def create_exam_set(set_data: ExamSetCreateSchema, created_by_user_id: int
                 """
                 INSERT INTO exam_sets (set_code, title, description, created_by_user_id)
                 VALUES (%s, %s, %s, %s)
-                RETURNING id, set_code, title, description, created_by_user_id, is_active, created_at, updated_at;
+                RETURNING id, set_code, is_locked, title, description, created_by_user_id, is_active, created_at, updated_at;
                 """,
                 (set_data.set_code, set_data.title, set_data.description,  created_by_user_id)
             )

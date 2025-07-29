@@ -1,6 +1,9 @@
 from datetime import datetime
+import logging
 from fastapi import FastAPI
-
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 from services.user_service import alarm_user_with_email
 from helpers.common import get_env_var
 from helpers.middlewares import catch_exceptions_middleware
@@ -14,7 +17,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from services.exam_service import cleanup_orphaned_files, create_instruction_audio, download_all_images, download_all_listening
+from services.exam_service import cleanup_orphaned_files, create_instruction_audio, download_all_images, download_all_listening, scoring_writing_exam_by_AI
 
 bearer_scheme = HTTPBearer()
 
@@ -76,6 +79,9 @@ def setup_scheduler():
         timezone="Asia/Bangkok"
     )
     scheduler.add_job(alarm_user_with_email, two_day_trigger, id='every_2_days_at_noon')
+    queue_trigger = IntervalTrigger(seconds=30, timezone="Asia/Bangkok")
+    scheduler.add_job(scoring_writing_exam_by_AI, queue_trigger, id='queue_scanner')
+
     scheduler.start()
     return scheduler
 
