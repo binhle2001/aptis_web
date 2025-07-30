@@ -79,9 +79,9 @@ def update_exam_submission(submission_id, submission_data, score = None):
     try:
         answer_string = json.dumps(submission_data)
         if score is None:
-            cursor.execute("UPDATE exam_submission SET answer_string = %s, is_scored = %s, score = %s, ai_review = false WHERE id = %s", (answer_string, False, None, submission_id))
+            cursor.execute("UPDATE exam_submission SET answer_string = %s, is_scored = %s, score = %s, ai_reviewed = false WHERE id = %s", (answer_string, False, None, submission_id))
         else:
-            cursor.execute("UPDATE exam_submission SET answer_string = %s, score = %s, is_scored = %s, ai_review = false WHERE id = %s", (answer_string, score, True, submission_id))
+            cursor.execute("UPDATE exam_submission SET answer_string = %s, score = %s, is_scored = %s, ai_reviewed = false WHERE id = %s", (answer_string, score, True, submission_id))
         conn.commit()
         return {"message": "success"}
     except Exception as e:
