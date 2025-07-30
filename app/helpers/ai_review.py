@@ -27,10 +27,11 @@ from google import genai
 from google.genai import types
 
 from .common import get_env_var
-client = genai.Client(
+
+def generate_writing_review(instruction, question, user_answer):
+    client = genai.Client(
         api_key=get_env_var("GEMINI", "API_KEY"),
     )
-def generate_writing_review(instruction, question, user_answer):
     model = "gemini-2.5-flash"
     contents = [
         types.Content(
@@ -85,6 +86,9 @@ Focus on:
 - Nếu bạn viết dài hơn giới hạn, hãy nói rõ rằng điều đó giúp câu hoàn chỉnh và tự nhiên hơn."""
 
 def generate_writing_suggestion_gemini(instruction, question, user_context):
+    client = genai.Client(
+        api_key=get_env_var("GEMINI", "API_KEY"),
+    )
     model = "gemini-2.5-flash"
     contents = [
         types.Content(
