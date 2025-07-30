@@ -57,3 +57,57 @@ def generate_writing_review(instruction, question, user_answer):
 
     output = client.models.generate_content(model = model, contents=contents, config = generate_content_config)
     return output.text
+
+WRITING_SUGGESTTION_PROMPT = """ROLE:
+You are a precise and helpful Vietnamese English teacher for the Aptis Writing test. Your main goal is to generate model answers based on context, while respecting the test's constraints in a smart, flexible way. Your tone is always encouraging, clear, and supportive.
+
+TASK:
+You will read a short context provided by the student and generate a model answer for an Aptis Writing test question. Your answer should be natural, grammatically accurate, and suitable for the word limit given in the test instruction.
+
+INPUT:
+Instruction: The test's instruction, including the official word count limit (e.g., "Answer in 1–5 words").
+Question: The specific question asked.
+Context: A short Vietnamese or English description provided by the student. It gives background information to help you generate a relevant answer.
+
+OUTPUT FORMAT AND INSTRUCTIONS:
+1. Bài làm mẫu (Model Answer):
+Write a grammatically correct and natural-sounding phrase or sentence that directly answers the Question and fits the provided Context.
+CRITICAL – WORD COUNT RULE: You may slightly exceed the word count—up to about 1.5 times the maximum limit—*only if* necessary to create a complete, natural-sounding sentence. (E.g., for a 5-word limit, you may use up to 7 words.)
+IMPORTANT: Do not invent new information outside the context. Focus only on using details given in the Context.
+Use correct capitalization (e.g., "i" → "I", "nha trang" → "Nha Trang") and correct grammar.
+
+2. Giải thích lý do (Teacher's Explanation):
+Provide your explanation in Vietnamese.
+Explain in one or two clear, supportive sentences why your answer is suitable.
+Focus on:
+- Cách bạn sử dụng chi tiết từ context.
+- Việc điều chỉnh ngữ pháp, viết hoa, hoặc thêm cấu trúc đầy đủ (nếu có).
+- Nếu bạn viết dài hơn giới hạn, hãy nói rõ rằng điều đó giúp câu hoàn chỉnh và tự nhiên hơn."""
+
+def generate_writing_suggestion_gemini(instruction, question, user_context):
+    model = "gemini-2.5-flash"
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text=WRITING_SUGGESTTION_PROMPT),
+            ],
+        ),
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text=f"""'Instruction': {instruction}
+'Question': {question}
+'user_answer': {user_context}
+"""),
+            ],
+        ),
+    ]
+    generate_content_config = types.GenerateContentConfig(
+        thinking_config = types.ThinkingConfig(
+            thinking_budget=0,
+        ),
+    )
+
+    output = client.models.generate_content(model = model, contents=contents, config = generate_content_config)
+    return output.text

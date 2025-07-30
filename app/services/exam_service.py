@@ -11,7 +11,7 @@ import os
 from psycopg2.extras import execute_values
 import requests
 from ai_tools.EN.inference import speak_EN
-from helpers.ai_review import generate_writing_review
+from helpers.ai_review import generate_writing_review, generate_writing_suggestion_gemini
 from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
 READING_FILES_DIR = "/app/raw_file/reading"
@@ -1202,7 +1202,7 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
                 "transcript":      first["transcript"],
                 "questions":       [r['question']        for r in rows3],
                 "correct_answers": [r['correct_answer'].strip()  for r in rows3],
-                "explains":        [r['explain'].strip()  for r in rows3]
+                "explains":        [r['explain'] for r in rows3]
             }
             result['part3'] = [block3]
         else:
@@ -2608,7 +2608,9 @@ def scoring_writing_exam_by_AI():
         cursor.close()
         return None
     
-
+def generate_writing_suggestion(instruction, question, context):
+    return generate_writing_suggestion_gemini(instruction, question, context)
+    
     
     
                 

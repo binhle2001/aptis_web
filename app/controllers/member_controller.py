@@ -9,7 +9,7 @@ from services.submission_services import get_submission_by_id, put_exam_submissi
 from schemas.user_schema import ExamSubmissionSchema, SpeakingAudioSchema
 from core.deps import get_current_member_user
 from schemas.auth_schema import TokenSchema, UserLoginSchema
-from schemas.exam_schema import AudioPath
+from schemas.exam_schema import AudioPath, WritingSuggestion
 from schemas.exam_set_schema import ExamSetListResponseSchema, ExamSetResponseSchema
 from services import auth_service, exam_service, exam_set_service
 import os 
@@ -119,6 +119,9 @@ async def post_audio_file_endpoint(
     return JSONResponse(status_code=status.HTTP_200_OK, content = {"audio_path": saved_audio_file_path_str})
 
 
-
+@router.post("/writing/generate")
+def generate_writing_suggestion_endpoint(item: WritingSuggestion):
+    result = exam_service.generate_writing_suggestion(item.instruction, item.question, item.context)
+    return JSONResponse(status_code=status.HTTP_200_OK, content = {"message": result})
     
 
