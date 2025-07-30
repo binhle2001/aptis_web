@@ -1202,7 +1202,7 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
                 "transcript":      first["transcript"],
                 "questions":       [r['question']        for r in rows3],
                 "correct_answers": [r['correct_answer'].strip()  for r in rows3],
-                "explains":        [r['explain'].strip()  for r in rows3]
+                "explains":        [r['explain'] for r in rows3]
             }
             result['part3'] = [block3]
         else:
@@ -1225,7 +1225,6 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
         part4 = []
         seen4 = set()
         for row in rows4:
-            print(row)
             link = row['audio_link']
             if link not in seen4:
                 seen4.add(link)
