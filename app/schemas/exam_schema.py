@@ -64,3 +64,14 @@ class AudioPath(BaseModel):
         json_schema_extra = {
             "audio_path": {}
         }
+        
+class WritingSuggestion(BaseModel):
+    instruction: str = Field(..., example="instruction")
+    question: str = Field(..., example="question")
+    context: str = Field(..., example="context")
+    class Config:
+        json_schema_extra = {
+            "instruction": "instruction",
+            "question": "question",
+            "context": "context"
+        }
