@@ -2678,7 +2678,7 @@ def scoring_speaking_exam_by_AI():
             k = 0
             for answer_audio_path, question in zip(use_answers, part["question"]):
                 transcript = transcript_text(answer_audio_path)
-                print(question)
+                print(answer_audio_path)
                 print(transcript)
                 if transcript is not None:
                     transcripts.append(transcript)
