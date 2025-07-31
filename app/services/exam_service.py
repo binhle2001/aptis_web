@@ -2678,6 +2678,8 @@ def scoring_speaking_exam_by_AI():
             k = 0
             for answer_audio_path, question in zip(use_answers, part["question"]):
                 transcript = transcript_text(answer_audio_path)
+                print(question)
+                print(transcript)
                 if transcript is not None:
                     transcripts.append(transcript)
                     if k == 0:
@@ -2686,9 +2688,9 @@ def scoring_speaking_exam_by_AI():
                         ai_review = generate_speaking_correction_gemini(instruction, question["text"], transcript, [])
                     ai_reviews.append(ai_review)
                 k += 1
-                print(instruction, question["text"], image_paths)
-                print(transcript)
-                print(ai_review)
+                # print(instruction, question["text"], image_paths)
+                # print(transcript)
+                # print(ai_review)
         answer_string["ai_review"] = ai_reviews
         answer_string["transcript"] = transcripts
         submission_data_string = json.dumps(answer_string, ensure_ascii=False)
