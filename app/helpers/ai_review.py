@@ -25,7 +25,7 @@ MODEL = "gemini-2.5-flash"
 
 from google import genai
 from google.genai import types
-
+import google.generativeai as google_genai
 from .common import get_env_var
 
 def generate_writing_review(instruction, question, user_answer):
@@ -199,12 +199,12 @@ Output Format:
 Provide only the raw, transcribed text. Do not include any headers, summaries, notes, or commentary. Your entire response should consist solely of the words spoken in the audio file."""
 
 def transcript_text(audio_path):
-    genai.configure(api_key=get_env_var("GEMINI", "API_KEY"))
+    google_genai.configure(api_key=get_env_var("GEMINI", "API_KEY"))
     mime_type = "audio/mpeg" # Giả sử bạn dùng file MP3
 
     with open(audio_path, "rb") as f:
         audio_data = f.read()
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = google_genai.GenerativeModel("gemini-2.5-flash")
     
     contents = [
         SPEECH_TO_TEXT_PROMPT,  # Cách viết ngắn gọn hơn để gửi text
