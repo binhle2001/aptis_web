@@ -11,7 +11,7 @@ import os
 from psycopg2.extras import execute_values
 import requests
 from ai_tools.EN.inference import speak_EN
-from helpers.ai_review import generate_writing_review, generate_writing_suggestion_gemini
+from helpers.ai_review import generate_speaking_suggestion_gemini, generate_writing_review, generate_writing_suggestion_gemini, transcript_text
 from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
 from .google_auth_service import download_drive_file_as_base64, get_google_credentials
@@ -2636,8 +2636,49 @@ def scoring_writing_exam_by_AI():
         cursor.close()
         return None
     
+def scoring_writing_exam_by_AI():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM exams WHERE exam_type = %s;", ("speaking",))
+    rows = cursor.fetchall()
+    
+    if not rows: 
+        return None
+    for row in rows:
+        exam_id = row["id"]
+        cursor.execute("SELECT id, exam_id, answer_string FROM exam_submission WHERE ai_reviewed = %s AND exam_id = %s AND is_scored = false;", (False, exam_id))
+        row = cursor.fetchone()
+        if not row:
+            continue
+        submission_id = row["id"]
+        transcripts = []
+        ai_reviews = []
+        answer_string = json.loads(row["answer_string"])
+        use_answers = answer_string["audioPaths"]
+        writing_data = get_writing_exam_by_id(exam_id)
+        ai_reviews = {}
+        for part_id, part in enumerate(writing_data):
+            instruction = part["instruction"]
+            for answer_audio_path, question in zip(use_answers, part["questions"]):
+                transcript = transcript_text(answer_audio_path)
+                if transcript is not None:
+                    transcripts.append(transcript)
+                    
+        answer_string["ai_review"] = ai_reviews
+        submission_data_string = json.dumps(answer_string, ensure_ascii=False)
+        cursor.execute("UPDATE exam_submission SET answer_string = %s, ai_reviewed = %s WHERE id = %s", (submission_data_string, True, submission_id))
+        conn.commit()
+        conn.close()
+        cursor.close()
+        return None    
+
 def generate_writing_suggestion(instruction, question, context):
     return generate_writing_suggestion_gemini(instruction, question, context)
+
+def generate_speaking_suggestion(instruction, question, context):
+    return generate_speaking_suggestion_gemini(instruction, question, context)
+
+
     
     
     

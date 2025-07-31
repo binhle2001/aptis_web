@@ -75,3 +75,16 @@ class WritingSuggestion(BaseModel):
             "question": "question",
             "context": "context"
         }
+
+class SpeakingSuggestion(BaseModel):
+    instruction: str = Field(..., example="instruction")
+    question: str = Field(..., example="question")
+    context: str = Field(..., example="context")
+    image_paths: list = []
+    class Config:
+        json_schema_extra = {
+            "instruction": "instruction",
+            "question": "question",
+            "context": "context",
+            "image_paths": []
+        }
