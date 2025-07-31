@@ -14,6 +14,7 @@ from ai_tools.EN.inference import speak_EN
 from helpers.ai_review import generate_writing_review, generate_writing_suggestion_gemini
 from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
+from .google_auth_service import download_drive_file_as_base64, get_google_credentials
 READING_FILES_DIR = "/app/raw_file/reading"
 SPEAKING_FILES_DIR = "/app/raw_file/speaking/excel"
 SPEAKING_IMAGES_DIR = "/app/raw_file/speaking/image"
@@ -1253,24 +1254,28 @@ def get_listening_exam_by_id(exam_id: int) -> dict:
 
 def load_audio_as_base64(path_or_url: str) -> str:
     """
-    Nếu path_or_url bắt đầu bằng http thì tải file về memory,
-    ngược lại mở file local.
-    Trả về base64-encoded string.
+    Nếu path_or_url là URL Google Drive thì dùng API để tải về bằng credentials,
+    nếu là đường dẫn local thì mở file từ disk.
+    Trả về chuỗi Base64 của file.
     """
     try:
         if path_or_url.lower().startswith("http"):
-            download_url = _ensure_drive_url(path_or_url)
-            path_or_url = "temp.mp3"
-            gdown.download(download_url, output=path_or_url, quiet=False)
-        with open(path_or_url, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode("utf-8")
+            # Xử lý URL từ Google Drive
+            base64_data = download_drive_file_as_base64(path_or_url)
+            if base64_data is None:
+                raise Exception("Không thể tải hoặc mã hóa file từ Google Drive.")
+            return base64_data
+        else:
+            # Đọc file local
+            with open(path_or_url, "rb") as f:
+                data = f.read()
+            return base64.b64encode(data).decode("utf-8")
     except Exception as e:
-        # Tùy nhu cầu, có thể raise hoặc trả về None
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail      = f"Cannot load audio [{path_or_url}]: {e}"
         )
+
 
 def _ensure_drive_url(url: str) -> str:
     m = re.search(r'/d/([^/]+)/', url)
@@ -1294,85 +1299,109 @@ def _download_file(url: str, local_path: str):
 
 
 
-# --- Main download function
 def download_all_listening():
     conn = get_db_connection()
     cur  = conn.cursor()
+    creds = get_google_credentials()
+    if not creds:
+        print("❌ Không thể xác thực Google. Dừng tiến trình.")
+        return
 
     for part in range(1, 5):
         table = f"listening_part_{part}"
         cur.execute(f"SELECT id, exam_id, audio_path FROM {table} WHERE audio_path IS NOT NULL ORDER BY id")
         rows = cur.fetchall()
+
         for row in rows:
-            rec_id, exam_id, path_in = row['id'], row['exam_id'],  row['audio_path']
-            # Build download URL
-            if path_in.lower().startswith('http'):
-                download_url = _ensure_drive_url(path_in)
-            else:
-                download_url = None
+            rec_id, exam_id, path_in = row['id'], row['exam_id'], row['audio_path']
 
-            # Local file path
-            ext = os.path.splitext(download_url or path_in)[1] or '.mp3'
+            # Kiểm tra URL Google Drive hay file local
+            is_drive_url = path_in.strip().lower().startswith('http')
             local_fname = f"{exam_id}_part{part}_{rec_id}.mp3"
-            local_path  = f'/app/raw_file/audio/{local_fname}'
-
-            # Download via gdown for HTTP URLs, skip local
-            if download_url:
+            local_path  = f"/app/raw_file/audio/{local_fname}"
+            
+            if is_drive_url:
+                
                 try:
-                    gdown.download(download_url, output=local_path, quiet=False)
-                    print(f"Downloaded: {download_url} -> {local_path}")
+                    # Tải dữ liệu và ghi ra file local
+                    print(f"🔽 Đang tải từ Google Drive: {path_in}")
+                    base64_data = download_drive_file_as_base64(path_in, creds)
+                    if not base64_data:
+                        raise Exception("Không thể tải hoặc mã hóa từ Google Drive.")
+
+                    # Giải mã Base64 và lưu ra file
+                    file_bytes = base64.b64decode(base64_data)
+                    with open(local_path, "wb") as f:
+                        f.write(file_bytes)
+
+                    print(f"✅ Đã lưu: {local_path}")
+
+                    # Cập nhật đường dẫn mới vào database
+                    cur.execute(f"""
+                        UPDATE {table}
+                           SET audio_path = %s
+                         WHERE id = %s
+                    """, (local_path, rec_id))
+                    conn.commit()
+
                 except Exception as e:
+                    print(f"❌ Lỗi khi tải file từ Google Drive: {e}")
                     cur.close()
                     conn.close()
-                    print(f"Failed to download {download_url}: {e}")
                     return
-                cur.execute(f"""
-                UPDATE {table}
-                   SET audio_path = %s
-                 WHERE id = %s
-            """, (local_path, rec_id))
-                conn.commit()
             else:
-                # Non-HTTP, assume local path, check exist
-                if not os.path.exists(path_in):
-                    print(f"Missing local file: {path_in}")
+                # Đường dẫn local
+                if os.path.exists(path_in):
+                    print(f"📁 File local tồn tại: {path_in}")
                 else:
-                    print(f"Local file exists: {path_in}")
+                    print(f"❌ Thiếu file local: {path_in}")
+
+    cur.close()
+    conn.close()
+
+
 
 def download_all_images():
     conn = get_db_connection()
     cur  = conn.cursor()
     table = "speaking"
+
+    creds = get_google_credentials()
+    if not creds:
+        print("❌ Không thể xác thực Google. Dừng tiến trình.")
+        return
+
     cur.execute(f"SELECT id, exam_id, image_path1, image_path2 FROM {table}")
     rows = cur.fetchall()
+
     for row in rows:
-        rec_id, exam_id, image_path1, image_path2 = row['id'], row['exam_id'],  row['image_path1'], row['image_path2']
-        # Build download URL
-        if image_path1 is not None:
-            if image_path1.lower().startswith('http'):
-                download_url = _ensure_drive_url(image_path1)
-                local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_1.jpg"
+        rec_id, exam_id, image_path1, image_path2 = row['id'], row['exam_id'], row['image_path1'], row['image_path2']
+
+        for idx, img_url in enumerate([image_path1, image_path2], start=1):
+            if img_url and img_url.lower().startswith('http'):
                 try:
-                    gdown.download(download_url, output=local_path, quiet=False)
+                    print(f"🔽 Đang tải ảnh {idx} cho record #{rec_id}: {img_url}")
+                    base64_data = download_drive_file_as_base64(img_url, creds)
+                    if not base64_data:
+                        raise Exception("Không thể tải hoặc mã hóa file ảnh từ Google Drive.")
+
+                    # Giải mã và lưu ảnh ra file
+                    local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_{idx}.jpg"
+                    with open(local_path, "wb") as f:
+                        f.write(base64.b64decode(base64_data))
+                    print(f"✅ Đã lưu ảnh {idx} tại: {local_path}")
+
+                    # Cập nhật lại đường dẫn ảnh trong DB
+                    field = f"image_path{idx}"
+                    cur.execute(f"""
+                        UPDATE {table}
+                           SET {field} = %s
+                         WHERE id = %s
+                    """, (local_path, rec_id))
+                    conn.commit()
                 except Exception as e:
-                    return e
-                cur.execute(f"""
-                    UPDATE {table}
-                        SET image_path1 = %s
-                        WHERE id = %s
-                """, (local_path, rec_id))
-                conn.commit()
-        if image_path2 is not None:
-            if image_path2.lower().startswith('http'):
-                download_url = _ensure_drive_url(image_path2)
-                local_path = f"{SPEAKING_IMAGES_DIR}/{rec_id}_2.jpg"
-                gdown.download(download_url, output=local_path, quiet=False)
-                cur.execute(f"""
-                    UPDATE {table}
-                        SET image_path2 = %s
-                        WHERE id = %s
-                """, (local_path, rec_id))
-                conn.commit()
+                    print(f"❌ Lỗi khi tải ảnh {idx} của record #{rec_id}: {e}")
+
     cur.close()
     conn.close()
 
