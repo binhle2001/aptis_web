@@ -2688,6 +2688,7 @@ def scoring_speaking_exam_by_AI():
                 k += 1
                     
         answer_string["ai_review"] = ai_reviews
+        answer_string["transcript"] = transcripts
         submission_data_string = json.dumps(answer_string, ensure_ascii=False)
         cursor.execute("UPDATE exam_submission SET answer_string = %s, ai_reviewed = %s WHERE id = %s", (submission_data_string, True, submission_id))
         conn.commit()
