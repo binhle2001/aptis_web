@@ -81,7 +81,7 @@ def setup_scheduler():
     scheduler.add_job(alarm_user_with_email, two_day_trigger, id='every_2_days_at_noon')
     queue_trigger = IntervalTrigger(seconds=30, timezone="Asia/Bangkok")
     scheduler.add_job(scoring_writing_exam_by_AI, queue_trigger, id='queue_scanner')
-    scheduler.add_job(scoring_speaking_exam_by_AI, queue_trigger, id='queue_scanner')
+    scheduler.add_job(scoring_speaking_exam_by_AI, queue_trigger, id='speaking_scanner')
     scheduler.start()
     return scheduler
 
