@@ -11,10 +11,10 @@ import os
 from psycopg2.extras import execute_values
 import requests
 from ai_tools.EN.inference import speak_EN
-from helpers.ai_review import generate_speaking_suggestion_gemini, generate_writing_review, generate_writing_suggestion_gemini, transcript_text
+from helpers.ai_review import generate_speaking_correction_gemini, generate_speaking_suggestion_gemini, generate_writing_review, generate_writing_suggestion_gemini, transcript_text
 from helpers.excel_parser import aptis_g_v_to_json, aptis_listening_to_json, aptis_reading_to_json, aptis_speaking_to_json, aptis_writing_to_json
 from services.auth_service import get_db_connection
-from .google_auth_service import download_drive_file_as_base64, get_google_credentials
+from .google_auth_service import download_drive_file, download_drive_file_as_base64, get_google_credentials
 READING_FILES_DIR = "/app/raw_file/reading"
 SPEAKING_FILES_DIR = "/app/raw_file/speaking/excel"
 SPEAKING_IMAGES_DIR = "/app/raw_file/speaking/image"
@@ -2636,7 +2636,7 @@ def scoring_writing_exam_by_AI():
         cursor.close()
         return None
     
-def scoring_writing_exam_by_AI():
+def scoring_speaking_exam_by_AI():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM exams WHERE exam_type = %s;", ("speaking",))
@@ -2653,16 +2653,39 @@ def scoring_writing_exam_by_AI():
         submission_id = row["id"]
         transcripts = []
         ai_reviews = []
+        image_paths = []
         answer_string = json.loads(row["answer_string"])
         use_answers = answer_string["audioPaths"]
-        writing_data = get_writing_exam_by_id(exam_id)
-        ai_reviews = {}
-        for part_id, part in enumerate(writing_data):
+        speaking_data = get_speaking_exam_by_id(exam_id)
+        for part_id, part in enumerate(speaking_data):
             instruction = part["instruction"]
+            
+            if part["image_url_1"]:
+                if "http" in part["image_url_1"]:
+                    download_drive_file(part["image_url_1"], output_path="image_url_1.jpg")
+                    image_paths.append("image_url_1.jpg")
+                else:
+                    image_paths.append(part["image_url_1"])
+                    
+                    
+            if part["image_url_2"]:
+                if "http" in part["image_url_2"]:
+                    download_drive_file(part["image_url_2"], output_path="image_url_2.jpg")
+                    image_paths.append("image_url_2.jpg")
+                else:
+                    image_paths.append(part["image_url_2"])
+                
+            k = 0
             for answer_audio_path, question in zip(use_answers, part["questions"]):
                 transcript = transcript_text(answer_audio_path)
                 if transcript is not None:
                     transcripts.append(transcript)
+                    if k == 0:
+                        ai_review = generate_speaking_correction_gemini(instruction, question, transcript, image_paths)
+                    else: 
+                        ai_review = generate_speaking_correction_gemini(instruction, question, transcript, [])
+                    ai_reviews.append(ai_review)
+                k += 1
                     
         answer_string["ai_review"] = ai_reviews
         submission_data_string = json.dumps(answer_string, ensure_ascii=False)
@@ -2675,8 +2698,8 @@ def scoring_writing_exam_by_AI():
 def generate_writing_suggestion(instruction, question, context):
     return generate_writing_suggestion_gemini(instruction, question, context)
 
-def generate_speaking_suggestion(instruction, question, context):
-    return generate_speaking_suggestion_gemini(instruction, question, context)
+def generate_speaking_suggestion(instruction, question, context, image_paths):
+    return generate_speaking_suggestion_gemini(instruction, question, context, image_paths)
 
 
     

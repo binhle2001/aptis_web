@@ -219,3 +219,84 @@ def transcript_text(audio_path):
     except Exception as e:
         print(f"Đã xảy ra lỗi trong quá trình gọi API: {e}")
         return None
+    
+    
+SPEAKING_REVIEW_PROMPT = """ROLE & TASK:
+You are an AI Tutor for the Aptis Speaking test (A2-B1 level). Your task is to evaluate a student's spoken response, provide corrections, and offer a revised version with analysis based strictly on the user's inputs.
+
+CRITICAL RULE:
+Your output must be direct. DO NOT write any introductory text, greetings, or conversational filler. Your response must begin immediately with the `1. Bài nói chữa lại (Revised Response)` heading. DO NOT repeat the user's original transcript.
+
+INPUTS:
+Instruction: The time limit for the task.
+Question: The question(s) the student was answering.
+Image (Optional): The image the student was describing, if any.
+Transcript: The student's spoken response, verbatim.
+
+OUTPUT FORMAT:
+
+1. Bài nói chữa lại (Revised Response):
+Content: Provide an improved version of the student's original response. Keep the student's main ideas but correct grammatical errors, improve vocabulary, and enhance sentence flow.
+Length & Style: The length should be appropriate for the time limit, and the style should be natural English with simple and compound sentences (using and, but, so, because), suitable for the A2-B1 level.
+
+2. Phân tích & Chữa lỗi (Analysis & Corrections):
+Format: Use a clear list or table format.
+- Lỗi (Mistake): Quote the specific incorrect phrase/sentence from the student's original 'Transcript'.
+- Sửa lại (Correction): Provide the corrected version of that phrase/sentence.
+- Giải thích (Explanation): Briefly explain the reason for the correction in Vietnamese (e.g., "Sai giới từ," "Sai thì động từ," "Từ vựng chưa phù hợp," "Cấu trúc này tự nhiên hơn,").
+
+3. Lời khuyên chung (General Advice):
+Content: Provide one single, concise tip in Vietnamese based on the most common or significant issue in the student's response (e.g., verb tense consistency, using conjunctions, pronunciation of a specific sound pattern).
+"""
+
+# Sử dụng prompt mới PROMPT_CORRECTION_SPEAKING_V2
+def generate_speaking_correction_gemini(instruction, question, user_transcript, image_paths=None): 
+    client = genai.Client(
+        api_key=get_env_var("GEMINI", "API_KEY"),
+    )
+    model = "gemini-2.5-flash"
+
+    # Sử dụng PROMPT_CORRECTION_SPEAKING_V2 mới
+    parts = [
+        types.Part.from_text(text=SPEAKING_REVIEW_PROMPT)
+    ]
+
+    # Chèn ảnh vào giữa nếu có
+    if image_paths:
+        for img_path in image_paths[:2]:
+            with open(img_path, "rb") as img_file:
+                image_data = img_file.read()
+                parts.append(
+                    types.Part.from_bytes(
+                        mime_type="image/png",
+                        data=image_data
+                    )
+                )
+
+    # Input của người dùng không thay đổi
+    user_prompt = f"""'Instruction': {instruction}
+'Question': {question}
+'Transcript': {user_transcript}
+"""
+    parts.append(types.Part.from_text(text=user_prompt))
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=parts,
+        )
+    ]
+
+    generate_content_config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            thinking_budget=0,
+        ),
+    )
+
+    output = client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=generate_content_config
+    )
+
+    return output.text

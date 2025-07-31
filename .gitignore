@@ -12,3 +12,5 @@ app/credentials.json
 app/token.json
 .env
 download_token.json
+app/image_url_1.jpg
+app/image_url_2.jpg

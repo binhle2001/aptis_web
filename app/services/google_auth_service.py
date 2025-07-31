@@ -60,7 +60,42 @@ def get_google_credentials():
 
     return creds
 
+def download_drive_file(url: str, creds = None, output_path = "") -> str:
+    """
+    Tải file từ Google Drive bằng API và trả về chuỗi Base64.
+    """
+    if creds is None:
+        creds = get_google_credentials()
+    # 1. Trích xuất File ID từ URL
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+    if not match:
+        raise ValueError("URL không hợp lệ hoặc không chứa File ID của Google Drive.")
+    file_id = match.group(1)
+    logging.info(f"Đã trích xuất File ID: {file_id}")
 
+    # 2. Xây dựng dịch vụ Google Drive API
+    logging.info("Đang xây dựng dịch vụ Google Drive API...")
+    service = build('drive', 'v3', credentials=creds)
+
+    # 3. Tạo yêu cầu tải file
+    request = service.files().get_media(fileId=file_id)
+
+    # 4. Tải file vào bộ nhớ (RAM)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    
+    logging.info("Bắt đầu tải file vào bộ nhớ...")
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+        if status:
+            logging.info(f"Đã tải xuống {int(status.progress() * 100)}%.")
+    
+    logging.info("Tải file hoàn tất.")
+    file_data = fh.getvalue()
+    with open(output_path, "wb") as output_file: 
+        output_file.write(file_data)
+        
 def download_drive_file_as_base64(url: str, creds = None) -> str:
     """
     Tải file từ Google Drive bằng API và trả về chuỗi Base64.
