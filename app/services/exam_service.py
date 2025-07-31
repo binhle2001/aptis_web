@@ -2656,6 +2656,7 @@ def scoring_speaking_exam_by_AI():
         image_paths = []
         answer_string = json.loads(row["answer_string"])
         use_answers = answer_string["audioPaths"]
+        
         speaking_data = get_speaking_exam_by_id(exam_id)
         for part_id, part in enumerate(speaking_data):
             instruction = part["instruction"]
