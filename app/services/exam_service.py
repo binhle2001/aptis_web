@@ -2686,7 +2686,9 @@ def scoring_speaking_exam_by_AI():
                         ai_review = generate_speaking_correction_gemini(instruction, question["text"], transcript, [])
                     ai_reviews.append(ai_review)
                 k += 1
-                    
+                print(instruction, question["text"], image_paths)
+                print(transcript)
+                print(ai_review)
         answer_string["ai_review"] = ai_reviews
         answer_string["transcript"] = transcripts
         submission_data_string = json.dumps(answer_string, ensure_ascii=False)
