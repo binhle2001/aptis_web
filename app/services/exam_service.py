@@ -2676,14 +2676,14 @@ def scoring_speaking_exam_by_AI():
                     image_paths.append(part["image_url_2"])
                 
             k = 0
-            for answer_audio_path, question in zip(use_answers, part["questions"]):
+            for answer_audio_path, question in zip(use_answers, part["question"]):
                 transcript = transcript_text(answer_audio_path)
                 if transcript is not None:
                     transcripts.append(transcript)
                     if k == 0:
-                        ai_review = generate_speaking_correction_gemini(instruction, question, transcript, image_paths)
+                        ai_review = generate_speaking_correction_gemini(instruction, question["text"], transcript, image_paths)
                     else: 
-                        ai_review = generate_speaking_correction_gemini(instruction, question, transcript, [])
+                        ai_review = generate_speaking_correction_gemini(instruction, question["text"], transcript, [])
                     ai_reviews.append(ai_review)
                 k += 1
                     
